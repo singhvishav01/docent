@@ -1,3 +1,4 @@
+// prisma/seed.ts
 import { PrismaClient } from '@prisma/client'
 import { hashPassword } from '../src/lib/auth'
 
@@ -5,6 +6,54 @@ const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Starting database seed...')
+
+  // Create admin user
+  const adminUser = {
+    id: 'admin-user-1',
+    email: 'admin@docent.app',
+    name: 'Admin User',
+    role: 'admin',
+    password: await hashPassword('admin123') // CHANGE THIS IN PRODUCTION!
+  }
+
+  await prisma.user.upsert({
+    where: { email: adminUser.email },
+    update: adminUser,
+    create: adminUser
+  })
+  console.log('✅ Admin user created: admin@docent.app / admin123')
+
+  // Create curator user
+  const curatorUser = {
+    id: 'curator-user-1',
+    email: 'curator@docent.app',
+    name: 'Test Curator',
+    role: 'curator',
+    password: await hashPassword('curator123')
+  }
+
+  await prisma.user.upsert({
+    where: { email: curatorUser.email },
+    update: curatorUser,
+    create: curatorUser
+  })
+  console.log('✅ Curator user created: curator@docent.app / curator123')
+
+  // Create regular visitor user
+  const testUser = {
+    id: 'test-user-1',
+    email: 'test@docent.app',
+    name: 'Test User',
+    role: 'visitor',
+    password: await hashPassword('testpass123')
+  }
+
+  await prisma.user.upsert({
+    where: { email: testUser.email },
+    update: testUser,
+    create: testUser
+  })
+  console.log('✅ Test user created: test@docent.app / testpass123')
 
   // Create test artworks
   const artworks = [
@@ -35,34 +84,6 @@ async function main() {
       qrCode: 'DOCENT-002',
       location: 'Gallery 3, West Wing',
       tags: 'surrealism,dali,time,dreams,melting clocks'
-    },
-    {
-      id: 'test-artwork-3',
-      title: 'Girl with a Pearl Earring',
-      artist: 'Johannes Vermeer',
-      year: 1665,
-      medium: 'Oil on canvas',
-      dimensions: '44.5 cm × 39 cm (17.5 in × 15.4 in)',
-      description: 'A captivating portrait of a girl wearing an exotic dress and a large pearl earring, painted with Vermeer\'s characteristic use of light.',
-      curatorNotes: 'Often called the "Mona Lisa of the North," this painting demonstrates Vermeer\'s masterful technique with light and his ability to create intimate, mysterious portraits.',
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/1665_Girl_with_a_Pearl_Earring.jpg/800px-1665_Girl_with_a_Pearl_Earring.jpg',
-      qrCode: 'DOCENT-003',
-      location: 'Gallery 1, Main Hall',
-      tags: 'dutch golden age,vermeer,portrait,baroque'
-    },
-    {
-      id: 'test-artwork-4',
-      title: 'The Great Wave off Kanagawa',
-      artist: 'Katsushika Hokusai',
-      year: 1831,
-      medium: 'Woodblock print',
-      dimensions: '25.7 cm × 37.9 cm (10.1 in × 14.9 in)',
-      description: 'The most famous work from Hokusai\'s series "Thirty-six Views of Mount Fuji," depicting a large wave threatening boats with Mount Fuji in the background.',
-      curatorNotes: 'This iconic ukiyo-e print demonstrates the Japanese aesthetic principle of capturing the beauty of the transient world and influenced Western Impressionist artists.',
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/The_Great_Wave_off_Kanagawa.jpg/1280px-The_Great_Wave_off_Kanagawa.jpg',
-      qrCode: 'DOCENT-004',
-      location: 'Gallery 4, Asian Art Wing',
-      tags: 'ukiyo-e,hokusai,japanese art,woodblock,mount fuji,waves'
     }
   ]
 
@@ -73,24 +94,13 @@ async function main() {
       create: artwork
     })
   }
+  console.log(`✅ Created ${artworks.length} artworks`)
 
-  // Create test user
-  const testUser = {
-    id: 'test-user-1',
-    email: 'test@docent.app',
-    name: 'Test User',
-    password: await hashPassword('testpass123')
-  }
-
-  await prisma.user.upsert({
-    where: { email: testUser.email },
-    update: testUser,
-    create: testUser
-  })
-
-  console.log('✅ Database seeded successfully!')
-  console.log(`Created ${artworks.length} artworks`)
-  console.log('Test user: test@docent.app / testpass123')
+  console.log('\n🎉 Database seeded successfully!')
+  console.log('\n📋 Test Accounts:')
+  console.log('   Admin:   admin@docent.app / admin123')
+  console.log('   Curator: curator@docent.app / curator123')
+  console.log('   Visitor: test@docent.app / testpass123')
 }
 
 main()

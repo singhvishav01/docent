@@ -1,13 +1,14 @@
+// src/app/api/auth/login/route.ts
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyPassword, generateToken, checkRateLimit } from '@/lib/auth'
+import type { UserRole } from '@/types/auth'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { email, password } = body
 
-    // Validate input
     if (!email || !password) {
       return Response.json(
         { error: 'Email and password are required' },
@@ -45,8 +46,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Generate token
-    const token = generateToken(user.id)
+    // Generate token with role
+    const token = generateToken(user.id, user.role as UserRole)
 
     // Set cookie and return success
     const response = Response.json({
@@ -54,11 +55,11 @@ export async function POST(req: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        role: user.role
       }
     })
 
-    // Set HTTP-only cookie
     response.headers.set(
       'Set-Cookie',
       `auth-token=${token}; HttpOnly; Secure=${process.env.NODE_ENV === 'production'}; SameSite=Strict; Max-Age=${7 * 24 * 60 * 60}; Path=/`

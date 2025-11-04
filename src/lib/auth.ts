@@ -1,8 +1,9 @@
+// src/lib/auth.ts
 import bcrypt from 'bcryptjs'
-import jwt, { SignOptions } from 'jsonwebtoken'
+import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
 import { db } from './db'
-import type { User } from '@/types/auth'
+import type { User, UserRole, AuthPayload } from '@/types/auth'
 import { NextRequest } from 'next/server'
 
 const JWT_SECRET: string = process.env.JWT_SECRET as string
@@ -20,13 +21,13 @@ export async function verifyPassword(password: string, hashedPassword: string): 
   return bcrypt.compare(password, hashedPassword)
 }
 
-export function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any })
+export function generateToken(userId: string, role: UserRole): string {
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any })
 }
 
-export function verifyToken(token: string): { userId: string } | null {
+export function verifyToken(token: string): AuthPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string }
+    return jwt.verify(token, JWT_SECRET) as AuthPayload
   } catch {
     return null
   }
@@ -44,16 +45,16 @@ export async function getCurrentUser(): Promise<User | null> {
 
     const user = await db.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, name: true, createdAt: true }
+      select: { id: true, email: true, name: true, role: true, createdAt: true }
     })
 
     if (!user) return null
 
-    // Convert Prisma's null to undefined for our interface
     return {
       id: user.id,
       email: user.email,
       name: user.name || undefined,
+      role: user.role as UserRole,
       createdAt: user.createdAt
     }
   } catch {
@@ -102,17 +103,15 @@ export function checkRateLimit(identifier: string): boolean {
   attempts.count++
   return true
 }
-// Add this new function for API route authentication
-export async function verifyRequestAuth(req: NextRequest): Promise<{ userId: string } | null> {
+
+export async function verifyRequestAuth(req: NextRequest): Promise<AuthPayload | null> {
   try {
-    // Try to get token from Authorization header first
     const authHeader = req.headers.get('Authorization')
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7)
       return verifyToken(token)
     }
 
-    // Fallback to cookies
     const cookieHeader = req.headers.get('cookie')
     if (cookieHeader) {
       const cookies = Object.fromEntries(
@@ -128,4 +127,22 @@ export async function verifyRequestAuth(req: NextRequest): Promise<{ userId: str
   } catch {
     return null
   }
+}
+
+// Role checking helpers
+export function requireRole(user: User | null, allowedRoles: UserRole[]): boolean {
+  if (!user) return false
+  return allowedRoles.includes(user.role)
+}
+
+export function isAdmin(user: User | null): boolean {
+  return user?.role === 'admin'
+}
+
+export function isCurator(user: User | null): boolean {
+  return user?.role === 'curator'
+}
+
+export function isCuratorOrAdmin(user: User | null): boolean {
+  return user?.role === 'curator' || user?.role === 'admin'
 }

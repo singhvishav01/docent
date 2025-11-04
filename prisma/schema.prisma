@@ -13,11 +13,13 @@ model User {
   email     String   @unique
   password  String
   name      String?
+  role      String   @default("visitor") // admin, curator, visitor
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   // Relations
   chatSessions ChatSession[]
+  curatorNotes CuratorNote[]
   
   @@map("users")
 }
@@ -41,8 +43,26 @@ model Artwork {
   // Relations
   chatSessions ChatSession[]
   messages     Message[]
+  notes        CuratorNote[]
   
   @@map("artworks")
+}
+
+model CuratorNote {
+  id         String   @id @default(cuid())
+  artworkId  String
+  museumId   String
+  curatorId  String
+  content    String
+  type       String   @default("interpretation") // interpretation, historical_context, technical_analysis, visitor_info
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  artwork    Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  curator    User     @relation(fields: [curatorId], references: [id], onDelete: Cascade)
+  
+  @@map("curator_notes")
 }
 
 model ChatSession {

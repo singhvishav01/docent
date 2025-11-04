@@ -1,49 +1,114 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getRAGInstance } from '@/lib/rag';
-import { verifyToken } from '@/lib/auth';
+// src/app/api/curator/notes/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+import { getCurrentUser, isCuratorOrAdmin } from '@/lib/auth'
 
+// GET - List curator notes (filtered by curator or all for admin)
+export async function GET(req: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!isCuratorOrAdmin(currentUser)) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Curator or admin access required.' },
+        { status: 403 }
+      )
+    }
+
+    const { searchParams } = new URL(req.url)
+    const artworkId = searchParams.get('artworkId')
+    const museumId = searchParams.get('museumId')
+
+    // Build query filters
+    const where: any = {}
+    
+    // If not admin, only show their own notes
+    if (currentUser.role === 'curator') {
+      where.curatorId = currentUser.id
+    }
+
+    if (artworkId) {
+      where.artworkId = artworkId
+    }
+
+    if (museumId) {
+      where.museumId = museumId
+    }
+
+    const notes = await db.curatorNote.findMany({
+      where,
+      include: {
+        curator: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return NextResponse.json(notes)
+
+  } catch (error) {
+    console.error('Fetch notes error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch notes' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Create new curator note
 export async function POST(req: NextRequest) {
   try {
-    // Verify authentication (you might want to add role-based access here)
-    const token = req.cookies.get('auth-token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await verifyToken(token);
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const { artworkId, museumId = 'default', content, curatorName, type = 'general' } = await req.json();
-
-    if (!artworkId || !content || !curatorName) {
+    const currentUser = await getCurrentUser()
+    if (!isCuratorOrAdmin(currentUser)) {
       return NextResponse.json(
-        { error: 'artworkId, content, and curatorName are required' },
-        { status: 400 }
-      );
+        { error: 'Unauthorized. Curator or admin access required.' },
+        { status: 403 }
+      )
     }
 
-    const rag = await getRAGInstance();
-    const success = await rag.addCuratorNote(artworkId, museumId, {
-      content,
-      curator_name: curatorName,
-      type
-    });
+    const { artworkId, museumId, content, type } = await req.json()
 
-    if (!success) {
+    if (!artworkId || !museumId || !content) {
       return NextResponse.json(
-        { error: 'Failed to add curator note' },
+        { error: 'artworkId, museumId, and content are required' },
         { status: 400 }
-      );
+      )
     }
 
-    return NextResponse.json({ success: true });
+    const validTypes = ['interpretation', 'historical_context', 'technical_analysis', 'visitor_info']
+    if (type && !validTypes.includes(type)) {
+      return NextResponse.json(
+        { error: `Invalid type. Must be one of: ${validTypes.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Create the note
+    const note = await db.curatorNote.create({
+      data: {
+        artworkId,
+        museumId,
+        curatorId: currentUser.id,
+        content,
+        type: type || 'interpretation'
+      },
+      include: {
+        curator: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      message: 'Note created successfully',
+      note
+    })
+
   } catch (error) {
-    console.error('Curator notes API error:', error);
+    console.error('Create note error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to create note' },
       { status: 500 }
-    );
+    )
   }
 }
