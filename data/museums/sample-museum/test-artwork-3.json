@@ -1,0 +1,36 @@
+{
+  "id": "test-artwork-3",
+  "title": "Urban Landscapes",
+  "artist": "Test Artist Gamma",
+  "year": "2024",
+  "medium": "Mixed media collage",
+  "dimensions": "100 × 150 cm (40 × 60 in)",
+  "location": "Sample Museum - Gallery B, Center Wall",
+  "description": "A contemporary interpretation of cityscapes through layered materials, incorporating found objects, photographs, and paint to create a multi-dimensional view of urban life.",
+  "provenance": "Acquired for the Sample Museum test collection to demonstrate mixed media techniques.",
+  "curator_notes": [
+    {
+      "id": "note_test_3_001",
+      "type": "interpretation",
+      "curator_name": "Contemporary Art Curator",
+      "content": "The artist successfully bridges the gap between photography and painting, creating a unique perspective on modern urban environments.",
+      "created_at": "2024-09-01T15:00:00.000Z"
+    },
+    {
+      "id": "note_test_3_002",
+      "type": "visitor_info",
+      "curator_name": "Education Team",
+      "content": "Look closely at the different textures - notice how newspaper clippings, fabric pieces, and paint layers create depth and tell stories about city life.",
+      "created_at": "2024-09-02T11:00:00.000Z"
+    },
+    {
+      "id": "note_test_3_003",
+      "type": "technical_analysis",
+      "curator_name": "Materials Specialist",
+      "content": "The collage technique employs various adhesives and mediums, requiring careful conservation considerations for long-term preservation.",
+      "created_at": "2024-09-03T09:00:00.000Z"
+    }
+  ],
+  "created_at": "2024-09-01T15:00:00.000Z",
+  "updated_at": "2024-09-03T09:00:00.000Z"
+}

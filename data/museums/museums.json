@@ -1,0 +1,26 @@
+[
+  {
+    "id": "met",
+    "name": "Metropolitan Museum of Art",
+    "description": "One of the world's largest and most prestigious art museums",
+    "location": "New York City"
+  },
+  {
+    "id": "moma",
+    "name": "Museum of Modern Art", 
+    "description": "A leading institution dedicated to modern and contemporary art",
+    "location": "New York City"
+  },
+  {
+    "id": "louvre",
+    "name": "Louvre Museum",
+    "description": "The world's most visited museum, housing thousands of works including the Mona Lisa",
+    "location": "Paris, France"
+  },
+  {
+    "id": "sample-museum",
+    "name": "Sample Museum",
+    "description": "A test museum for development purposes (fallback)",
+    "location": "Development Environment"
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "id": "test-artwork-2",
+  "title": "Abstract Composition II",
+  "artist": "Test Artist Beta",
+  "year": "2023",
+  "medium": "Digital art on canvas",
+  "dimensions": "60 × 80 cm (24 × 32 in)",
+  "location": "Sample Museum - Gallery A, Wall 2",
+  "description": "A vibrant exploration of geometric forms and color relationships, featuring bold primary colors arranged in dynamic compositions that challenge traditional spatial perspectives.",
+  "provenance": "Created specifically for testing purposes in the Sample Museum collection.",
+  "curator_notes": [
+    {
+      "id": "note_test_2_001",
+      "type": "interpretation",
+      "curator_name": "Test Curator",
+      "content": "This piece demonstrates the interplay between geometric abstraction and color theory, showcasing how simple shapes can create complex visual narratives.",
+      "created_at": "2024-09-01T10:00:00.000Z"
+    },
+    {
+      "id": "note_test_2_002",
+      "type": "technical_analysis",
+      "curator_name": "Digital Art Specialist",
+      "content": "The digital medium allows for precise color gradients and sharp geometric boundaries that would be difficult to achieve with traditional media.",
+      "created_at": "2024-09-02T14:30:00.000Z"
+    }
+  ],
+  "created_at": "2024-09-01T10:00:00.000Z",
+  "updated_at": "2024-09-02T14:30:00.000Z"
+}

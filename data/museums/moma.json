@@ -1,0 +1,27 @@
+{
+  "id": "moma",
+  "name": "Museum of Modern Art",
+  "description": "The Museum of Modern Art in New York City",
+  "artworks": [
+    {
+      "id": "starry_night",
+      "title": "The Starry Night",
+      "artist": "Vincent van Gogh",
+      "year": 1889,
+      "medium": "Oil on canvas",
+      "dimensions": "73.7 cm × 92.1 cm",
+      "description": "The Starry Night is an oil-on-canvas painting by Dutch Post-Impressionist painter Vincent van Gogh. Painted in June 1889, it depicts the view from the east-facing window of his asylum room at Saint-Rémy-de-Provence, just before sunrise, with the addition of an imaginary village.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
+      "gallery": "Gallery 3",
+      "accession_number": "472.1941",
+      "period": "Post-Impressionism",
+      "curator_notes": [
+        {
+          "note": "This painting was created during van Gogh's stay at the asylum in Saint-Rémy-de-Provence.",
+          "author": "Dr. Sarah Johnson",
+          "date": "2024-01-15"
+        }
+      ]
+    }
+  ]
+}

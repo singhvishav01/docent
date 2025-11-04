@@ -1,0 +1,65 @@
+{
+  "id": "louvre",
+  "name": "Louvre Museum",
+  "description": "The world's largest art museum in Paris",
+  "artworks": [
+    {
+      "id": "mona_lisa",
+      "title": "Mona Lisa",
+      "artist": "Leonardo da Vinci",
+      "year": 1517,
+      "medium": "Oil on poplar panel",
+      "dimensions": "77 cm × 53 cm",
+      "description": "The Mona Lisa is a half-length portrait painting by Italian artist Leonardo da Vinci. Considered an archetypal masterpiece of the Italian Renaissance, it has been described as the best known, the most visited, the most written about, the most sung about, the most parodied work of art in the world.",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/687px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
+      "gallery": "Salle des États",
+      "accession_number": "779",
+      "period": "Italian Renaissance",
+      "curator_notes": [
+        {
+          "note": "The subject's enigmatic smile has made this painting one of the most famous works in the world.",
+          "author": "Dr. Marie Dubois",
+          "date": "2024-02-10"
+        }
+      ]
+    },
+    {
+      "id": "venus_de_milo",
+      "title": "Venus de Milo",
+      "artist": "Alexandros of Antioch",
+      "year": -150,
+      "medium": "Parian marble",
+      "dimensions": "203 cm height",
+      "description": "The Venus de Milo is an ancient Greek statue and one of the most famous works of ancient Greek sculpture. Created sometime between 150 and 100 BCE, it is believed to depict Aphrodite, the Greek goddess of love and beauty.",
+      "gallery": "Sully Wing, Ground Floor",
+      "accession_number": "Ma 399",
+      "period": "Hellenistic Greece",
+      "curator_notes": [
+        {
+          "note": "The missing arms have sparked centuries of debate about the statue's original pose and attributes.",
+          "author": "Dr. Classical Sculpture Expert",
+          "date": "2024-01-20"
+        }
+      ]
+    },
+    {
+      "id": "liberty_leading_people",
+      "title": "Liberty Leading the People",
+      "artist": "Eugène Delacroix",
+      "year": 1830,
+      "medium": "Oil on canvas",
+      "dimensions": "260 cm × 325 cm",
+      "description": "Liberty Leading the People is a painting by Eugène Delacroix commemorating the July Revolution of 1830, which toppled King Charles X of France. A woman personifying the concept and the Goddess of Liberty leads the people forward over a barricade and the bodies of the fallen, holding the flag of the French Revolution.",
+      "gallery": "Denon Wing",
+      "accession_number": "RF 129",
+      "period": "French Romanticism",
+      "curator_notes": [
+        {
+          "note": "The painting became a symbol of the French Republic and inspired the Statue of Liberty in New York Harbor.",
+          "author": "Dr. French Revolutionary Art",
+          "date": "2024-02-15"
+        }
+      ]
+    }
+  ]
+}

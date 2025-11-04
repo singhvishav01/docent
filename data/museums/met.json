@@ -1,0 +1,85 @@
+{
+  "id": "met",
+  "name": "Metropolitan Museum of Art",
+  "description": "One of the world's largest and most prestigious art museums",
+  "artworks": [
+    {
+      "id": "washington_crossing",
+      "title": "Washington Crossing the Delaware",
+      "artist": "Emanuel Leutze",
+      "year": 1851,
+      "description": "Washington Crossing the Delaware is an 1851 oil-on-canvas painting by German-American artist Emanuel Leutze. It commemorates General George Washington during his famous crossing of the Delaware River with the Continental Army on the night of December 25–26, 1776, during the American Revolutionary War.",
+      "medium": "Oil on canvas",
+      "dimensions": "378.5 cm × 647.7 cm",
+      "curator_notes": [
+        {
+          "note": "This iconic painting was actually painted in Düsseldorf, Germany, and depicts a dramatized version of the historical event.",
+          "author": "Dr. American History",
+          "date": "2024-01-10",
+          "type": "interpretation"
+        }
+      ],
+      "gallery": "Gallery 760",
+      "accession_number": "97.34",
+      "period": "19th Century American"
+    },
+    {
+      "id": "egyptian_temple",
+      "title": "Temple of Dendur",
+      "artist": "Ancient Egyptian Architects",
+      "year": -15,
+      "description": "The Temple of Dendur is a Roman Egyptian religious structure originally located in Tuzis (later Dendur), about 80 kilometers south of modern Aswan. Built around 15 BC, it was dedicated to the goddess Isis and the deified brothers Pedesi and Pihor from Nubia.",
+      "medium": "Sandstone",
+      "dimensions": "6.4 m × 12.9 m × 6.4 m",
+      "curator_notes": [
+        {
+          "note": "This temple was gifted to the United States by Egypt in 1965 and has been housed in the Met since 1978.",
+          "author": "Dr. Egyptian Art Curator",
+          "date": "2024-01-15",
+          "type": "interpretation"
+        }
+      ],
+      "gallery": "Sackler Wing",
+      "accession_number": "68.154",
+      "period": "Roman Period Egypt"
+    },
+    {
+      "id": "armor_field",
+      "title": "Field Armor of King Henry VIII of England",
+      "artist": "Royal Armorers of Greenwich",
+      "year": 1544,
+      "description": "This field armor was made for King Henry VIII around 1544 at the royal armories at Greenwich. It represents the height of European armor-making craft and shows the king's impressive physical stature during the later years of his reign.",
+      "medium": "Steel, brass, leather",
+      "dimensions": "185 cm height",
+      "curator_notes": [
+        {
+          "note": "The armor shows Henry VIII's increased girth in his later years, reflecting historical accounts of his physical decline.",
+          "author": "Dr. Medieval Arms Specialist",
+          "date": "2024-02-01",
+          "type": "interpretation"
+        }
+      ],
+      "gallery": "Arms and Armor Galleries",
+      "accession_number": "19.151.3a-j",
+      "period": "Tudor England"
+    },
+    {
+      "id": "death_of_socrates",
+      "title": "The Death Of Socrates",
+      "artist": "Jacques-Louis David",
+      "year": 1787,
+      "medium": "Oil on canvas",
+      "dimensions": "51 × 77 inches (129.5 × 196.2 cm)",
+      "description": "The final moments of the Greek philosopher Socrates, condemned to death by an Athenian court for “corrupting the youth” and “impiety.”\n\nHe’s sitting on a bed, about to drink hemlock (a poisonous brew).\n\nAround him are his grieving friends and students (Plato, Crito, etc.).\n\nSocrates is depicted as calm, pointing upward — symbolizing his belief in the immortality of the soul — while others show despair.",
+      "location": "",
+      "provenance": "1787 – Commissioned by Charles-Michel Trudaine de Montigny, a French official and patron.\n\n1787–1789 – Exhibited at the Paris Salon.\n\n1798 – Sold in Paris to English collector Charles Townley.\n\n19th century – Passed through a few private English collections.\n\n1931 – Purchased in London by American banker Horace Havemeyer.\n\n1931 – Gifted by Horace Havemeyer and his wife Susan to the Metropolitan Museum of Art, New York.\n\n1931–present – In the permanent collection of The Met (Accession no. 31.45).\n\nSo, unlike a lot of Old Masters, this painting’s ownership history is relatively straightforward: French commission → English collection(s) → American collector → The Met.",
+      "image_url": "https://www.experimentaltraveler.com/wp-content/uploads/Socrates-11.png",
+      "gallery": "",
+      "accession_number": "",
+      "period": "",
+      "curator_notes": [],
+      "created_at": "2025-09-09T03:19:37.571Z",
+      "updated_at": "2025-09-09T03:19:37.572Z"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  chatSessions ChatSession[]
+  
+  @@map("users")
+}
+
+model Artwork {
+  id          String   @id @default(cuid())
+  title       String
+  artist      String
+  year        Int?
+  medium      String?
+  dimensions  String?
+  description String
+  curatorNotes String?
+  imageUrl    String?
+  qrCode      String   @unique
+  location    String?
+  tags        String  // Comma-separated tags for search
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  chatSessions ChatSession[]
+  messages     Message[]
+  
+  @@map("artworks")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String?
+  artworkId String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  artwork  Artwork   @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  messages Message[]
+  
+  @@map("chat_sessions")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  artworkId String
+  role      String   // "user" or "assistant"
+  content   String
+  metadata  String?  // Store grounding sources, transition info, etc. (as JSON string)
+  createdAt DateTime @default(now())
+  
+  // Relations
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  artwork Artwork     @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  
+  @@map("messages")
+}
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@map("auth_sessions")
+}

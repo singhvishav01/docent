@@ -1,0 +1,43 @@
+{
+  "id": "test-artwork-4",
+  "title": "Meditation in Blue",
+  "artist": "Test Artist Delta",
+  "year": "2024",
+  "medium": "Oil on canvas",
+  "dimensions": "120 × 90 cm (48 × 36 in)",
+  "location": "Sample Museum - Gallery C, Featured Wall",
+  "description": "A serene monochromatic study exploring various shades and textures of blue, inviting viewers into a contemplative space through subtle gradations and organic forms.",
+  "provenance": "Part of the Sample Museum's contemporary collection, created to demonstrate color studies and meditative art practices.",
+  "curator_notes": [
+    {
+      "id": "note_test_4_001",
+      "type": "interpretation",
+      "curator_name": "Color Theory Expert",
+      "content": "This work exemplifies how a limited palette can create infinite emotional depth. The artist uses temperature variations within blue to guide the viewer's eye and emotional response.",
+      "created_at": "2024-09-01T12:00:00.000Z"
+    },
+    {
+      "id": "note_test_4_002",
+      "type": "technical_analysis",
+      "curator_name": "Painting Conservator",
+      "content": "Notice the subtle impasto techniques in the lighter areas contrasted with thin glazes in the shadows. This creates both textural and optical depth.",
+      "created_at": "2024-09-02T16:00:00.000Z"
+    },
+    {
+      "id": "note_test_4_003",
+      "type": "visitor_info",
+      "curator_name": "Mindfulness Art Guide",
+      "content": "This piece is designed for contemplative viewing. Try spending 2-3 minutes just observing how your eye moves across the surface and how the blues affect your mood.",
+      "created_at": "2024-09-03T10:30:00.000Z"
+    },
+    {
+      "id": "note_test_4_004",
+      "type": "historical_context",
+      "curator_name": "Modern Art Historian",
+      "content": "The monochromatic approach echoes the work of Yves Klein and other color field painters, while maintaining a contemporary sensibility through its organic forms.",
+      "created_at": "2024-09-03T14:00:00.000Z"
+    }
+  ],
+  "created_at": "2024-09-01T12:00:00.000Z",
+  "updated_at": "2024-09-03T14:00:00.000Z"
+}

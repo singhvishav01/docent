@@ -1,0 +1,69 @@
+{
+  "id": "sample-museum",
+  "name": "Sample Museum",
+  "description": "A sample museum for testing",
+  "artworks": [
+    {
+      "id": "test-artwork-1",
+      "title": "Sample Artwork",
+      "artist": "Test Artist",
+      "year": 2024,
+      "medium": "Digital Art",
+      "dimensions": "100 cm × 100 cm",
+      "description": "This is a sample artwork for testing the museum guide application.",
+      "gallery": "Test Gallery",
+      "accession_number": "TEST.001",
+      "period": "Contemporary",
+      "curator_notes": [
+        {
+          "note": "This is a test artwork created for development purposes.",
+          "author": "System Admin",
+          "date": "2024-01-01"
+        }
+      ]
+    },
+    {
+      "id": "test-artwork-2",
+      "title": "Abstract Expression",
+      "artist": "Modern Test Artist",
+      "year": 2024,
+      "medium": "Acrylic on Canvas",
+      "dimensions": "120 cm × 80 cm",
+      "description": "A vibrant abstract piece exploring color relationships and emotional expression through bold brushstrokes.",
+      "gallery": "Modern Wing",
+      "accession_number": "TEST.002",
+      "period": "Contemporary",
+      "curator_notes": [
+        {
+          "note": "This piece demonstrates contemporary abstract techniques with emphasis on color theory.",
+          "author": "Dr. Art Curator",
+          "date": "2024-02-15"
+        }
+      ]
+    },
+    {
+      "id": "test-artwork-4",
+      "title": "Digital Landscape",
+      "artist": "Tech Artist Collective",
+      "year": 2024,
+      "medium": "Digital Print on Metal",
+      "dimensions": "150 cm × 100 cm",
+      "description": "A stunning digital landscape that blends photography with algorithmic art, representing the intersection of technology and nature.",
+      "gallery": "Digital Art Section",
+      "accession_number": "TEST.004",
+      "period": "Digital Contemporary",
+      "curator_notes": [
+        {
+          "note": "Pioneering work in the digital art space, showcasing new possibilities in medium integration.",
+          "author": "Digital Arts Curator",
+          "date": "2024-03-10"
+        },
+        {
+          "note": "The algorithmic elements were generated using machine learning techniques trained on natural landscape patterns.",
+          "author": "Technical Curator",
+          "date": "2024-03-12"
+        }
+      ]
+    }
+  ]
+}
