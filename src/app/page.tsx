@@ -22,7 +22,10 @@ export default function HomePage() {
               <Link href="/museums" className="text-gray-600 hover:text-blue-600 font-medium">
                 Museums
               </Link>
-              <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+              <Link href="/auth/signup" className="text-gray-600 hover:text-blue-600 font-medium">
+                Sign Up
+              </Link>
+              <Link href="/auth/login" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
                 Sign In
               </Link>
             </div>
@@ -132,6 +135,43 @@ export default function HomePage() {
             <div className="p-4 border border-gray-200 rounded-lg opacity-50">
               <h4 className="font-semibold text-gray-500 mb-1">Your museum here</h4>
               <p className="text-sm text-gray-400">Contact us to add your collection</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Role-based Access Info */}
+        <div className="mt-12 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-8 text-center">
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">Museum Staff?</h3>
+          <p className="text-gray-600 mb-6">Curator and admin tools are available after signing in</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/auth/login"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+            >
+              Sign In to Access Staff Tools
+            </Link>
+          </div>
+          <div className="mt-6 text-sm text-gray-600 bg-white rounded-lg p-4 max-w-2xl mx-auto">
+            <p className="font-semibold mb-2">After signing in, you'll have access to:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-purple-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <span className="font-medium text-purple-900">Curator Dashboard</span>
+                  <p className="text-xs text-gray-500">Add and manage curator notes</p>
+                </div>
+              </div>
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-gray-800 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <span className="font-medium text-gray-900">Admin Dashboard</span>
+                  <p className="text-xs text-gray-500">Full museum management access</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -150,10 +150,11 @@ export default function CuratorDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions for Admins */}
+        {/* Quick Actions for Admins ONLY */}
         {currentUser?.role === 'admin' && (
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="font-semibold text-blue-900 mb-2">Admin Actions</h3>
+            <p className="text-sm text-blue-700 mb-3">You're logged in as an administrator</p>
             <div className="flex gap-4">
               <Link
                 href="/admin/dashboard"

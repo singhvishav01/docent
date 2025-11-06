@@ -1,12 +1,19 @@
+// src/app/admin/dashboard/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Museum } from '@/lib/rag/types';
+
+interface Museum {
+  id: string;
+  name: string;
+  description?: string;
+  location?: string;
+}
 
 interface DashboardStats {
   totalMuseums: number;
   totalArtworks: number;
-  recentUpdates: number;
+  totalUsers: number;
 }
 
 export default function AdminDashboard() {
@@ -14,7 +21,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalMuseums: 0,
     totalArtworks: 0,
-    recentUpdates: 0
+    totalUsers: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +32,9 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const [museumsResponse] = await Promise.all([
-        fetch('/api/museums')
+      const [museumsResponse, usersResponse] = await Promise.all([
+        fetch('/api/museums'),
+        fetch('/api/admin/users')
       ]);
 
       if (!museumsResponse.ok) {
@@ -36,7 +44,7 @@ export default function AdminDashboard() {
       const museumsData = await museumsResponse.json();
       setMuseums(museumsData);
       
-      // Calculate stats
+      // Calculate total artworks
       let totalArtworks = 0;
       for (const museum of museumsData) {
         try {
@@ -50,10 +58,17 @@ export default function AdminDashboard() {
         }
       }
 
+      // Get user count
+      let userCount = 0;
+      if (usersResponse.ok) {
+        const users = await usersResponse.json();
+        userCount = users.length;
+      }
+
       setStats({
         totalMuseums: museumsData.length,
         totalArtworks,
-        recentUpdates: 0 // TODO: Track recent updates
+        totalUsers: userCount
       });
 
     } catch (err) {
@@ -99,8 +114,8 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Museum Admin Dashboard</h1>
-          <p className="text-gray-600">Manage museum collections and artwork information</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage museums, artworks, and users</p>
         </div>
 
         {/* Stats Cards */}
@@ -135,14 +150,14 @@ export default function AdminDashboard() {
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Recent Updates</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.recentUpdates}</p>
+                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.totalUsers}</p>
               </div>
             </div>
           </div>
@@ -173,23 +188,23 @@ export default function AdminDashboard() {
             </Link>
 
             <Link
-              href="/admin/test-chat"
+              href="/admin/users"
               className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
             >
               <svg className="w-6 h-6 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
-              <span className="font-medium text-purple-900">Test Chat</span>
+              <span className="font-medium text-purple-900">Manage Users</span>
             </Link>
 
             <Link
-              href="/admin/reports"
-              className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              href="/admin/test-chat"
+              className="flex items-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
             >
-              <svg className="w-6 h-6 text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <svg className="w-6 h-6 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <span className="font-medium text-gray-900">View Reports</span>
+              <span className="font-medium text-yellow-900">Test Chat</span>
             </Link>
           </div>
         </div>

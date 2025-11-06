@@ -1,3 +1,4 @@
+// src/app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { hashPassword, generateToken } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -34,18 +35,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash password and create user
+    // Hash password and create user with default 'visitor' role
     const hashedPassword = await hashPassword(password)
     const user = await db.user.create({
       data: {
         email: email.toLowerCase(),
         password: hashedPassword,
-        name: name || null
+        name: name || null,
+        role: 'visitor' // Default role for new signups
       }
     })
 
-    // Generate token
-    const token = generateToken(user.id)
+    // Generate token with role
+    const token = generateToken(user.id, user.role as any)
 
     // Create response with cookie
     const response = NextResponse.json({
@@ -53,7 +55,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        role: user.role
       }
     })
 

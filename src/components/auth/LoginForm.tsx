@@ -1,7 +1,8 @@
+// src/components/auth/LoginForm.tsx
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export function LoginForm() {
@@ -12,6 +13,8 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,6 +22,8 @@ export function LoginForm() {
     setMessage('')
 
     try {
+      console.log('Attempting login with:', formData.email)
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -27,17 +32,32 @@ export function LoginForm() {
         body: JSON.stringify(formData)
       })
 
+      console.log('Login response status:', response.status)
+
       const data = await response.json()
+      console.log('Login response data:', data)
 
       if (response.ok) {
         setMessage('Logged in successfully!')
-        router.push('/scan')
+        
+        // Redirect based on role or redirect parameter
+        if (redirectTo) {
+          router.push(redirectTo)
+        } else if (data.user.role === 'admin') {
+          router.push('/admin/dashboard')
+        } else if (data.user.role === 'curator') {
+          router.push('/curator')
+        } else {
+          router.push('/scan')
+        }
+        
         router.refresh()
       } else {
         setMessage(data.error || 'Login failed')
       }
     } catch (error) {
-      setMessage('Network error. Please try again.')
+      console.error('Login error:', error)
+      setMessage('Network error. Please check your connection and try again.')
     } finally {
       setIsLoading(false)
     }
@@ -70,6 +90,14 @@ export function LoginForm() {
           {message}
         </div>
       )}
+
+      {/* Test Credentials Helper */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs">
+        <p className="font-semibold text-blue-900 mb-1">Test Credentials:</p>
+        <p className="text-blue-700">Admin: admin@docent.app / admin123</p>
+        <p className="text-blue-700">Curator: curator@docent.app / curator123</p>
+        <p className="text-blue-700">Visitor: test@docent.app / testpass123</p>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
