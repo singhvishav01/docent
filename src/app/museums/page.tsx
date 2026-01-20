@@ -14,25 +14,56 @@ export default function MuseumsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadMuseums() {
-      try {
-        const response = await fetch('/api/museums');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const museumData = await response.json();
-        console.log('Loaded museums:', museumData);
-        setMuseums(museumData);
-      } catch (err) {
-        console.error('Failed to load museums:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load museums');
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadMuseums();
   }, []);
+
+  const loadMuseums = async () => {
+    try {
+      console.log('Starting to fetch museums...');
+      const response = await fetch('/api/museums');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const museumData = await response.json();
+      console.log('Raw museum data:', museumData);
+      console.log('Type:', typeof museumData);
+      console.log('Is Array?', Array.isArray(museumData));
+      
+      if (typeof museumData === 'object' && !Array.isArray(museumData)) {
+        console.log('Object keys:', Object.keys(museumData));
+      }
+      
+      // Handle different response formats
+      let museumsArray: MuseumWithStats[] = [];
+      
+      if (Array.isArray(museumData)) {
+        museumsArray = museumData;
+      } else if (museumData && typeof museumData === 'object') {
+        // Check if museums are nested in an object
+        if (museumData.museums && Array.isArray(museumData.museums)) {
+          museumsArray = museumData.museums;
+        } else if (museumData.data && Array.isArray(museumData.data)) {
+          museumsArray = museumData.data;
+        } else {
+          console.error('Unexpected data format:', museumData);
+        }
+      }
+      
+      console.log('Final museums array:', museumsArray);
+      setMuseums(museumsArray);
+    } catch (err) {
+      console.error('Failed to load museums:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load museums');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -75,13 +106,20 @@ export default function MuseumsPage() {
           </p>
         </div>
 
+        {/* Debug info */}
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+          <p className="text-sm text-yellow-800">
+            Debug: Found {museums.length} museums
+          </p>
+        </div>
+
         {/* Museums Grid */}
         {museums.length === 0 ? (
           <div className="text-center py-12">
             <div className="bg-white rounded-lg shadow-sm p-8 max-w-md mx-auto">
               <h3 className="text-xl font-semibold text-gray-800 mb-2">No Museums Found</h3>
               <p className="text-gray-600">
-                No museums are currently loaded in the system. Check the server logs for details.
+                No museums are currently loaded in the system. Check the browser console for details.
               </p>
             </div>
           </div>
@@ -112,12 +150,6 @@ export default function MuseumsPage() {
                   {museum.description && (
                     <p className="text-gray-600 text-sm mb-4 line-clamp-3">
                       {museum.description}
-                    </p>
-                  )}
-
-                  {museum.artworkCount !== undefined && (
-                    <p className="text-sm text-gray-500 mb-4">
-                      {museum.artworkCount} artwork{museum.artworkCount !== 1 ? 's' : ''}
                     </p>
                   )}
 
