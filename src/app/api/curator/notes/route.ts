@@ -22,8 +22,15 @@ export async function GET(req: NextRequest) {
     const where: any = {}
     
     // If not admin, only show their own notes
-    if (currentUser.role === 'curator') {
+    if (currentUser?.role === 'curator') {
       where.curatorId = currentUser.id
+    }
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      )
     }
 
     if (artworkId) {
@@ -59,7 +66,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
-    if (!isCuratorOrAdmin(currentUser)) {
+    if (!currentUser || !isCuratorOrAdmin(currentUser)) {
       return NextResponse.json(
         { error: 'Unauthorized. Curator or admin access required.' },
         { status: 403 }

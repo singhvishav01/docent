@@ -1,100 +1,32 @@
 // prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
 }
+
+// ============================================================================
+// AUTHENTICATION & USERS
+// ============================================================================
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
   name      String?
-  role      String   @default("visitor") // admin, curator, visitor
+  role      String   @default("visitor")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Relations
   chatSessions ChatSession[]
   curatorNotes CuratorNote[]
   
   @@map("users")
-}
-
-model Artwork {
-  id          String   @id @default(cuid())
-  title       String
-  artist      String
-  year        Int?
-  medium      String?
-  dimensions  String?
-  description String
-  curatorNotes String?
-  imageUrl    String?
-  qrCode      String   @unique
-  location    String?
-  tags        String  // Comma-separated tags for search
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  chatSessions ChatSession[]
-  messages     Message[]
-  notes        CuratorNote[]
-  
-  @@map("artworks")
-}
-
-model CuratorNote {
-  id         String   @id @default(cuid())
-  artworkId  String
-  museumId   String
-  curatorId  String
-  content    String
-  type       String   @default("interpretation") // interpretation, historical_context, technical_analysis, visitor_info
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  // Relations
-  artwork    Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
-  curator    User     @relation(fields: [curatorId], references: [id], onDelete: Cascade)
-  
-  @@map("curator_notes")
-}
-
-model ChatSession {
-  id        String   @id @default(cuid())
-  userId    String?
-  artworkId String
-  title     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  artwork  Artwork   @relation(fields: [artworkId], references: [id], onDelete: Cascade)
-  messages Message[]
-  
-  @@map("chat_sessions")
-}
-
-model Message {
-  id        String   @id @default(cuid())
-  sessionId String
-  artworkId String
-  role      String   // "user" or "assistant"
-  content   String
-  metadata  String?  // Store grounding sources, transition info, etc. (as JSON string)
-  createdAt DateTime @default(now())
-  
-  // Relations
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  artwork Artwork     @relation(fields: [artworkId], references: [id], onDelete: Cascade)
-  
-  @@map("messages")
 }
 
 model AuthSession {
@@ -105,4 +37,152 @@ model AuthSession {
   createdAt DateTime @default(now())
   
   @@map("auth_sessions")
+}
+
+// ============================================================================
+// MUSEUM & ARTWORK DATA
+// ============================================================================
+
+model Museum {
+  id          String   @id
+  name        String
+  description String?  @db.Text
+  location    String?
+  website     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  artworks         Artwork[]
+  curatorNotes     CuratorNote[]
+  artworkEmbeddings ArtworkEmbedding[]
+  chatSessions     ChatSession[]
+  messages         Message[]
+  
+  @@map("museums")
+}
+
+model Artwork {
+  museumId  String
+  id        String
+  
+  title       String
+  artist      String
+  year        Int?
+  medium      String?
+  dimensions  String?
+  
+  description String?  @db.Text
+  provenance  String?  @db.Text
+  
+  imageUrl         String?
+  gallery          String?
+  accessionNumber  String?
+  period           String?
+  tags             String?
+  
+  qrCode      String?  @unique
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  museum Museum @relation(fields: [museumId], references: [id], onDelete: Cascade)
+  
+  @@id([museumId, id])
+  @@index([museumId])
+  @@index([artist])
+  @@index([isActive])
+  @@map("artworks")
+}
+
+// ============================================================================
+// CURATOR NOTES
+// ============================================================================
+
+model CuratorNote {
+  id         String   @id @default(cuid())
+  artworkId  String
+  museumId   String
+  curatorId  String
+  content    String   @db.Text
+  type       String   @default("interpretation")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  museum  Museum @relation(fields: [museumId], references: [id], onDelete: Cascade)
+  curator User   @relation(fields: [curatorId], references: [id], onDelete: Cascade)
+  
+  @@index([museumId, artworkId])
+  @@index([curatorId])
+  @@map("curator_notes")
+}
+
+// ============================================================================
+// EMBEDDINGS
+// ============================================================================
+
+model ArtworkEmbedding {
+  id        String   @id @default(cuid())
+  artworkId String
+  museumId  String
+  
+  chunkType  String
+  chunkIndex Int      @default(0)
+  sourceId   String?
+  
+  content    String   @db.Text
+  embedding  Unsupported("vector(1536)")
+  
+  tokenCount Int
+  model      String   @default("text-embedding-3-small")
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  museum Museum @relation(fields: [museumId], references: [id], onDelete: Cascade)
+  
+  @@index([museumId, artworkId])
+  @@index([chunkType])
+  @@index([sourceId])
+  @@map("artwork_embeddings")
+}
+
+// ============================================================================
+// CHAT SESSIONS & MESSAGES
+// ============================================================================
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String?
+  artworkId String
+  museumId  String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  museum   Museum   @relation(fields: [museumId], references: [id], onDelete: Cascade)
+  messages Message[]
+  
+  @@index([museumId, artworkId])
+  @@map("chat_sessions")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  artworkId String
+  museumId  String
+  role      String
+  content   String   @db.Text
+  metadata  String?  @db.Text
+  createdAt DateTime @default(now())
+  
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  museum  Museum      @relation(fields: [museumId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([museumId, artworkId])
+  @@map("messages")
 }

@@ -4,11 +4,17 @@ const nextConfig = {
     serverComponentsExternalPackages: ['prisma', '@prisma/client']
   },
   images: {
-    domains: ['upload.wikimedia.org', 'localhost'],
+    domains: ['upload.wikimedia.org', 'localhost', 'www.experimentaltraveler.com'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'upload.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.experimentaltraveler.com',
         port: '',
         pathname: '/**',
       }
