@@ -4,21 +4,20 @@ const nextConfig = {
     serverComponentsExternalPackages: ['prisma', '@prisma/client']
   },
   images: {
-    domains: ['upload.wikimedia.org', 'localhost', 'www.experimentaltraveler.com'],
+    domains: ['upload.wikimedia.org', 'localhost'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'upload.wikimedia.org',
         port: '',
         pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'www.experimentaltraveler.com',
-        port: '',
-        pathname: '/**',
       }
     ]
+  },
+  // Force environment variable loading
+  env: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    USE_DATABASE_RAG: process.env.USE_DATABASE_RAG,
   },
   async headers() {
     return [

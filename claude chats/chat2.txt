@@ -1,0 +1,867 @@
+✓ Starting...
+ ✓ Ready in 3.3s
+ ○ Compiling / ...
+ ✓ Compiled / in 5.3s (514 modules)
+ GET / 200 in 5771ms
+ ✓ Compiled in 444ms (259 modules)
+ ○ Compiling /museums ...
+ ✓ Compiled /museums in 2.4s (503 modules)
+ ○ Compiling /api/museums ...
+ ✓ Compiled /api/museums in 813ms (426 modules)
+Museums API: Loading RAG instance...
+🔌 Using DATABASE-backed RAG system
+🔌 Initializing database-backed RAG system...
+❌ Database connection failed: PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async getRAGInstance (webpack-internal:///(rsc)/./src/lib/rag/index.ts:23:13)
+    at async GET (webpack-internal:///(rsc)/./src/app/api/museums/route.ts:13:21)
+    at async C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+    at async eT.execute (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+    at async eT.handle (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+    at async doRender (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1366:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1588:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1496:28)
+    at async DevServer.renderPageComponent (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1924:24)
+    at async DevServer.renderToResponseImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:922:25)    
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:818:17)
+    at async C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:179:21)    
+    at async handleRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:359:24)   
+    at async requestHandlerImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+Museums API error: PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async getRAGInstance (webpack-internal:///(rsc)/./src/lib/rag/index.ts:23:13)
+    at async GET (webpack-internal:///(rsc)/./src/app/api/museums/route.ts:13:21)
+    at async C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+    at async eT.execute (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+    at async eT.handle (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+    at async doRender (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1366:42)
+    at async cacheEntry.responseCache.get.routeKind (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1588:28)
+    at async DevServer.renderToResponseWithComponentsImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1496:28)
+    at async DevServer.renderPageComponent (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1924:24)
+    at async DevServer.renderToResponseImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:922:25)    
+    at async NextNodeServer.handleCatchallRenderRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\base-server.js:818:17)
+    at async C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:179:21)    
+    at async handleRequest (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:359:24)   
+    at async requestHandlerImpl (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\next\dist\server\lib\start-server.js:141:13) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+ GET /api/museums 500 in 1117ms
+Museums API: Loading RAG instance...
+Museums API: Getting museums...
+🔌 Initializing database-backed RAG system...
+Museums API: Returning undefined museums
+ GET /api/museums 200 in 19ms
+❌ Database connection failed: PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async DatabaseRetrieval.getMuseums (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:132:9) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async DatabaseRetrieval.getMuseums (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:132:9) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+ ⨯ unhandledRejection: PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async DatabaseRetrieval.getMuseums (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:132:9) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+ ⨯ unhandledRejection: PrismaClientInitializationError: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:24:13)
+    at async DatabaseRetrieval.getMuseums (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:132:9) {
+  clientVersion: '5.22.0',
+  errorCode: 'P1012'
+}
+if you reference chat1 and see where it ended,
+when I followed those steps this is what I get
+
+5:22 PM
+I see the issue - the Prisma Client still isn't reading the DATABASE_URL correctly. Let me provide a comprehensive fix.
+
+The error the URL must start with the protocol postgresql:// means Prisma is getting an empty or malformed DATABASE_URL. This is a Next.js environment variable loading issue.
+
+COMPLETE FIX: Force Environment Variables to Load
+Step 1: Install dotenv Package
+bash
+npm install dotenv
+Step 2: Update database-retrieval.ts with Explicit dotenv Loading
+Replace the entire src/lib/rag/database-retrieval.ts:
+
+typescript
+// src/lib/rag/database-retrieval.ts
+import { config } from 'dotenv';
+config(); // Load .env immediately
+
+import { PrismaClient } from '@prisma/client';
+import { ArtworkData, Museum, CuratorNote } from './types';
+
+// Singleton pattern with explicit initialization
+let prismaInstance: PrismaClient | null = null;
+
+function getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    console.log('🔧 Creating Prisma Client with DATABASE_URL:', 
+      process.env.DATABASE_URL ? 'LOADED' : 'MISSING');
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    prismaInstance = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
+      },
+      log: ['error', 'warn']
+    });
+  }
+  return prismaInstance;
+}
+
+export class DatabaseRetrieval {
+  private initialized = false;
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    console.log('🔌 Initializing database-backed RAG system...');
+    console.log('DATABASE_URL status:', process.env.DATABASE_URL ? 'Present' : 'Missing');
+    
+    try {
+      const prisma = getPrismaClient();
+      await prisma.$connect();
+      const museumCount = await prisma.museum.count();
+      const artworkCount = await prisma.artwork.count();
+      console.log(`✅ Connected to database: ${museumCount} museums, ${artworkCount} artworks`);
+      this.initialized = true;
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+
+  async getArtworkData(artworkId: string, museumId?: string): Promise<ArtworkData | null> {
+    await this.initialize();
+    const prisma = getPrismaClient();
+
+    try {
+      let artwork;
+
+      if (museumId) {
+        artwork = await prisma.artwork.findUnique({
+          where: {
+            museumId_id: { museumId, id: artworkId }
+          },
+          include: {
+            museum: true
+          }
+        });
+      }
+
+      if (!artwork) {
+        const artworks = await prisma.artwork.findMany({
+          where: { id: artworkId },
+          include: { museum: true },
+          take: 1
+        });
+        artwork = artworks[0];
+      }
+
+      if (!artwork) return null;
+
+      const curatorNotes = await prisma.curatorNote.findMany({
+        where: {
+          museumId: artwork.museumId,
+          artworkId: artwork.id
+        },
+        include: {
+          curator: {
+            select: { id: true, name: true, email: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return this.transformToArtworkData(artwork, curatorNotes);
+
+    } catch (error) {
+      console.error('Error fetching artwork:', error);
+      return null;
+    }
+  }
+
+  async getMuseumArtworks(museumId: string): Promise<ArtworkData[]> {
+    await this.initialize();
+    const prisma = getPrismaClient();
+
+    try {
+      const artworks = await prisma.artwork.findMany({
+        where: { 
+          museumId,
+          isActive: true 
+        },
+        include: { museum: true },
+        orderBy: { title: 'asc' }
+      });
+
+      const results: ArtworkData[] = [];
+
+      for (const artwork of artworks) {
+        const curatorNotes = await prisma.curatorNote.findMany({
+          where: {
+            museumId: artwork.museumId,
+            artworkId: artwork.id
+          },
+          include: {
+            curator: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        });
+
+        results.push(this.transformToArtworkData(artwork, curatorNotes));
+      }
+
+      return results;
+
+    } catch (error) {
+      console.error('Error fetching museum artworks:', error);
+      return [];
+    }
+  }
+
+  async getMuseums(): Promise<Museum[]> {
+    await this.initialize();
+    const prisma = getPrismaClient();
+
+    try {
+      const museums = await prisma.museum.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' }
+      });
+
+      return museums.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description || undefined,
+        location: m.location || undefined
+      }));
+
+    } catch (error) {
+      console.error('Error fetching museums:', error);
+      return [];
+    }
+  }
+
+  async searchArtworks(query: string, museumId?: string): Promise<ArtworkData[]> {
+    await this.initialize();
+    const prisma = getPrismaClient();
+
+    try {
+      const whereClause: any = {
+        isActive: true,
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { artist: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } }
+        ]
+      };
+
+      if (museumId) {
+        whereClause.museumId = museumId;
+      }
+
+      const artworks = await prisma.artwork.findMany({
+        where: whereClause,
+        include: { museum: true },
+        take: 10
+      });
+
+      const results: ArtworkData[] = [];
+
+      for (const artwork of artworks) {
+        const curatorNotes = await prisma.curatorNote.findMany({
+          where: {
+            museumId: artwork.museumId,
+            artworkId: artwork.id
+          },
+          include: {
+            curator: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        });
+
+        results.push(this.transformToArtworkData(artwork, curatorNotes));
+      }
+
+      return results;
+
+    } catch (error) {
+      console.error('Error searching artworks:', error);
+      return [];
+    }
+  }
+
+  formatArtworkContext(artwork: ArtworkData): string {
+    const parts = [
+      `Title: ${artwork.title}`,
+      `Artist: ${artwork.artist}`,
+      artwork.year && `Year: ${artwork.year}`,
+      artwork.medium && `Medium: ${artwork.medium}`,
+      artwork.dimensions && `Dimensions: ${artwork.dimensions}`,
+      artwork.description && `Description: ${artwork.description}`,
+      artwork.provenance && `Provenance: ${artwork.provenance}`
+    ].filter(Boolean);
+
+    if (artwork.curator_notes && artwork.curator_notes.length > 0) {
+      parts.push('');
+      parts.push('Curator Notes:');
+      artwork.curator_notes.forEach((note, index) => {
+        parts.push(`${index + 1}. ${note.content} (${note.type || 'general'}) - ${note.curator_name}`);
+      });
+    }
+
+    return parts.join('\n');
+  }
+
+  private transformToArtworkData(artwork: any, curatorNotes: any[]): ArtworkData {
+    return {
+      id: artwork.id,
+      title: artwork.title,
+      artist: artwork.artist,
+      year: artwork.year || undefined,
+      description: artwork.description || undefined,
+      medium: artwork.medium || undefined,
+      dimensions: artwork.dimensions || undefined,
+      location: artwork.gallery || undefined,
+      provenance: artwork.provenance || undefined,
+      image_url: artwork.imageUrl || undefined,
+      gallery: artwork.gallery || undefined,
+      accession_number: artwork.accessionNumber || undefined,
+      period: artwork.period || undefined,
+      museum: artwork.museumId,
+      museum_name: artwork.museum?.name,
+      curator_notes: curatorNotes.map(note => ({
+        id: note.id,
+        content: note.content,
+        curator_name: note.curator?.name || note.curator?.email || 'Unknown',
+        created_at: note.createdAt.toISOString(),
+        type: note.type as any
+      })),
+      created_at: artwork.createdAt?.toISOString(),
+      updated_at: artwork.updatedAt?.toISOString()
+    };
+  }
+
+  async disconnect(): Promise<void> {
+    if (prismaInstance) {
+      await prismaInstance.$disconnect();
+      prismaInstance = null;
+    }
+  }
+}
+Step 3: Create next.config.js to Force .env Loading
+Create or update next.config.js:
+
+javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['prisma', '@prisma/client']
+  },
+  images: {
+    domains: ['upload.wikimedia.org', 'localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      }
+    ]
+  },
+  // Force environment variable loading
+  env: {
+    DATABASE_URL: process.env.DATABASE_URL,
+    USE_DATABASE_RAG: process.env.USE_DATABASE_RAG,
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT' },
+          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+        ]
+      }
+    ]
+  }
+}
+
+module.exports = nextConfig
+Step 4: Clean Everything and Restart
+bash
+# Stop the server
+
+# Delete all caches
+rmdir /s /q .next
+rmdir /s /q node_modules\.prisma
+
+# Regenerate Prisma Client
+npx prisma generate
+
+# Restart
+npm run dev
+Step 5: Verify .env is Correct
+Make sure your .env has NO extra spaces or hidden characters:
+
+env
+DATABASE_URL="postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public"
+USE_DATABASE_RAG="true"
+JWT_SECRET="your-secret"
+JWT_EXPIRES_IN="7d"
+OPENAI_API_KEY="your-key"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+AUTH_RATE_LIMIT_MAX="5"
+AUTH_RATE_LIMIT_WINDOW="15"
+```
+
+### Expected Output
+
+When you run `npm run dev`, you should see:
+```
+🔌 Using DATABASE-backed RAG system
+🔌 Initializing database-backed RAG system...
+DATABASE_URL status: Present
+🔧 Creating Prisma Client with DATABASE_URL: LOADED
+✅ Connected to database: 5 museums, 13 artworks
+If It STILL Doesn't Work: Temporary Workaround
+As an absolute last resort, hardcode the DATABASE_URL in database-retrieval.ts:
+
+typescript
+function getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    const dbUrl = process.env.DATABASE_URL || 
+      "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public";
+    
+    console.log('Using DATABASE_URL:', dbUrl.substring(0, 30) + '...');
+    
+    prismaInstance = new PrismaClient({
+      datasources: {
+        db: { url: dbUrl }
+      }
+    });
+  }
+  return prismaInstance;
+}
+This will at least get you unstuck while we figure out the environment variable issue.
+
+What to try:
+
+Run the commands above (install dotenv, update files, clean cache)
+If you see "DATABASE_URL status: Present" but still get errors, send me the exact error
+If you see "DATABASE_URL status: Missing", we have an environment loading issue
+Let me know what happens!
+
+
+npm install dotenv
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: @zxing/browser@0.1.5
+npm error Found: @zxing/library@0.20.0
+npm error node_modules/@zxing/library
+npm error   @zxing/library@"^0.20.0" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error peer @zxing/library@"^0.21.0" from @zxing/browser@0.1.5
+npm error node_modules/@zxing/browser
+npm error   @zxing/browser@"^0.1.4" from the root project
+npm error
+npm error Conflicting peer dependency: @zxing/library@0.21.3
+npm error node_modules/@zxing/library
+npm error   peer @zxing/library@"^0.21.0" from @zxing/browser@0.1.5
+npm error   node_modules/@zxing/browser
+npm error     @zxing/browser@"^0.1.4" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error C:\Users\Vishav\AppData\Local\npm-cache\_logs\2026-01-20T21_23_24_103Z-eresolve-report.txt
+npm error A complete log of this run can be found in: C:\Users\Vishav\AppData\Local\npm-cache\_logs\2026-01-20T21_23_24_103Z-debug-0.log
+
+C:\Users\Vishav\Desktop\New folder (6)\docent>rmdir /s /q .next
+
+C:\Users\Vishav\Desktop\New folder (6)\docent>rmdir /s /q node_modules\.prisma
+
+C:\Users\Vishav\Desktop\New folder (6)\docent>npx prisma generate
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to .\node_modules\@prisma\client in 183ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+
+
+C:\Users\Vishav\Desktop\New folder (6)\docent>npm run dev
+
+> docent@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.32
+  - Local:        http://localhost:3000
+  - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 2s
+ ○ Compiling /museums ...
+ ✓ Compiled /museums in 5.1s (520 modules)
+ GET /museums 200 in 5614ms
+ ✓ Compiled in 436ms (264 modules)
+ ○ Compiling /api/museums ...
+ ⨯ ./src/lib/rag/database-retrieval.ts:2:1
+Module not found: Can't resolve 'dotenv'
+  1 | // src/lib/rag/database-retrieval.ts
+> 2 | import { config } from 'dotenv';
+    | ^
+  3 | config(); // Load .env immediately
+  4 |
+  5 | import { PrismaClient } from '@prisma/client';
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/rag/index.ts
+./src/app/api/museums/route.ts
+ ⨯ ./src/lib/rag/database-retrieval.ts:2:1
+Module not found: Can't resolve 'dotenv'
+  1 | // src/lib/rag/database-retrieval.ts
+> 2 | import { config } from 'dotenv';
+    | ^
+  3 | config(); // Load .env immediately
+  4 |
+  5 | import { PrismaClient } from '@prisma/client';
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/rag/index.ts
+./src/app/api/museums/route.ts
+ ⨯ ./src/lib/rag/database-retrieval.ts:2:1
+Module not found: Can't resolve 'dotenv'
+  1 | // src/lib/rag/database-retrieval.ts
+> 2 | import { config } from 'dotenv';
+    | ^
+  3 | config(); // Load .env immediately
+  4 |
+  5 | import { PrismaClient } from '@prisma/client';
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/rag/index.ts
+./src/app/api/museums/route.ts
+ ⨯ ./src/lib/rag/database-retrieval.ts:2:1
+Module not found: Can't resolve 'dotenv'
+  1 | // src/lib/rag/database-retrieval.ts
+> 2 | import { config } from 'dotenv';
+    | ^
+  3 | config(); // Load .env immediately
+  4 |
+  5 | import { PrismaClient } from '@prisma/client';
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/rag/index.ts
+./src/app/api/museums/route.ts
+ GET /api/museums 500 in 6522ms
+ GET /api/museums 500 in 42ms
+ GET /museums 500 in 30ms
+The dotenv install failed due to a dependency conflict. Let's skip it and use a simpler approach - Next.js already loads .env files, we just need to ensure Prisma uses them correctly.
+SIMPLIFIED FIX (No dotenv needed)
+Step 1: Remove dotenv import from database-retrieval.ts
+Update the first few lines of src/lib/rag/database-retrieval.ts:
+typescript// src/lib/rag/database-retrieval.ts
+// REMOVE dotenv import - Next.js handles .env automatically
+import { PrismaClient } from '@prisma/client';
+import { ArtworkData, Museum, CuratorNote } from './types';
+
+// Singleton pattern with explicit DATABASE_URL check
+let prismaInstance: PrismaClient | null = null;
+
+function getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    // Get DATABASE_URL from environment
+    const databaseUrl = process.env.DATABASE_URL;
+    
+    console.log('🔧 Creating Prisma Client...');
+    console.log('DATABASE_URL present:', !!databaseUrl);
+    
+    if (!databaseUrl) {
+      console.error('❌ DATABASE_URL is missing!');
+      console.error('Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE')));
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    // Create Prisma Client with explicit URL
+    prismaInstance = new PrismaClient({
+      datasources: {
+        db: {
+          url: databaseUrl
+        }
+      },
+      log: ['error', 'warn']
+    });
+  }
+  return prismaInstance;
+}
+
+// ... rest of the file stays the same
+Keep everything else in the file the same - just replace the top portion (lines 1-30 or so).
+Step 2: Fix the ZXing Dependency Issue (Bonus)
+While we're at it, let's fix that QR scanner dependency conflict:
+bashnpm install @zxing/library@^0.21.0 --save
+Step 3: Clean and Restart
+bash# Clean Next.js cache
+rmdir /s /q .next
+
+# Restart
+npm run dev
+```
+
+### Expected Output
+
+You should now see:
+```
+🔌 Using DATABASE-backed RAG system
+🔌 Initializing database-backed RAG system...
+🔧 Creating Prisma Client...
+DATABASE_URL present: true
+✅ Connected to database: 5 museums, 13 artworks
+If It STILL Shows "DATABASE_URL present: false"
+Then we have a Next.js environment loading issue. Try this nuclear option:
+
+Stop the server
+Temporarily hardcode the connection in database-retrieval.ts:
+
+typescriptfunction getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    // TEMPORARY HARDCODE - Replace with your actual connection string
+    const databaseUrl = process.env.DATABASE_URL || 
+      "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public";
+    
+    console.log('🔧 Using DATABASE_URL:', databaseUrl.substring(0, 40) + '...');
+    
+    prismaInstance = new PrismaClient({
+      datasources: {
+        db: { url: databaseUrl }
+      }
+    });
+  }
+  return prismaInstance;
+}
+
+Restart and test:
+
+bashnpm run dev
+This hardcoded fallback will at least let you continue testing while we debug the environment variable issue.
+What's the Real Problem?
+Next.js should automatically load .env files. The issue is that Prisma Client is being generated/bundled before Next.js loads environment variables.
+The hardcoded fallback is a temporary workaround. Once you confirm the database connection works, we can investigate why Next.js isn't passing DATABASE_URL to the Prisma Client properly.
+Try this and let me know:
+
+What you see in the console logs
+Whether it connects successfully
+If you can browse to http://localhost:3000/museums and see museums
+Using DATABASE-backed RAG system
+🔌 Initializing database-backed RAG system...
+🔧 Creating Prisma Client...
+DATABASE_URL present: true
+❌ Database connection failed: PrismaClientInitializationError: error: Error validating datasource db: the URL must start with the protocol postgresql:// or postgres://.
+  -->  schema.prisma:9
+   | 
+ 8 |   provider   = "postgresql"
+ 9 |   url        = env("DATABASE_URL")
+   | 
+Validation Error Count: 1
+    at t (C:\Users\Vishav\Desktop\New folder (6)\docent\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async DatabaseRetrieval.initialize (webpack-internal:///(rsc)/./src/lib/rag/database-retrieval.ts:44:13)
+    at async getRAGInstance (webpack-internal:///(rsc)/./src/lib/rag/index.ts:23:13)
+    at async GET (wShow less5:29 PMThe issue is clear now - DATABASE_URL is present in Node.js (process.env.DATABASE_URL) but Prisma Client was generated with a different/empty value and is cached.
+THE REAL FIX: Force Prisma to Use Runtime DATABASE_URL
+The problem is that Prisma Client is pre-compiled and doesn't pick up runtime environment variables. We need to bypass the schema's env("DATABASE_URL") reference.
+Step 1: Update Prisma Schema to Accept Direct URL
+Edit prisma/schema.prisma:
+prismadatasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL") // Add this line
+  extensions = [pgvector(map: "vector")]
+}
+Step 2: Update .env with Both URLs
+envDATABASE_URL="postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public"
+DIRECT_URL="postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public"
+USE_DATABASE_RAG="true"
+JWT_SECRET="your-secret"
+JWT_EXPIRES_IN="7d"
+OPENAI_API_KEY="your-key"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+AUTH_RATE_LIMIT_MAX="5"
+AUTH_RATE_LIMIT_WINDOW="15"
+Step 3: Regenerate Prisma Client
+bashnpx prisma generate
+Step 4: Update database-retrieval.ts to Use directUrl
+typescript// src/lib/rag/database-retrieval.ts
+import { PrismaClient } from '@prisma/client';
+import { ArtworkData, Museum, CuratorNote } from './types';
+
+let prismaInstance: PrismaClient | null = null;
+
+function getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    const databaseUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
+    
+    console.log('🔧 Creating Prisma Client...');
+    console.log('DATABASE_URL present:', !!databaseUrl);
+    
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    // Force Prisma to use our runtime URL
+    prismaInstance = new PrismaClient({
+      datasourceUrl: databaseUrl, // Use datasourceUrl instead of datasources
+    });
+  }
+  return prismaInstance;
+}
+
+export class DatabaseRetrieval {
+  private initialized = false;
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    console.log('🔌 Initializing database-backed RAG system...');
+    
+    try {
+      const prisma = getPrismaClient();
+      await prisma.$connect();
+      const museumCount = await prisma.museum.count();
+      const artworkCount = await prisma.artwork.count();
+      console.log(`✅ Connected to database: ${museumCount} museums, ${artworkCount} artworks`);
+      this.initialized = true;
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+
+  // ... rest of your methods stay exactly the same
+Step 5: Clean Everything Again
+bash# Stop server
+# Delete caches
+rmdir /s /q .next
+rmdir /s /q node_modules\.prisma
+
+# Regenerate
+npx prisma generate
+
+# Start
+npm run dev
+If This STILL Doesn't Work: Ultimate Bypass
+If the above still fails, use this guaranteed-to-work version:
+typescriptfunction getPrismaClient(): PrismaClient {
+  if (!prismaInstance) {
+    // HARDCODED FALLBACK - bypasses all .env issues
+    const connectionString = "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public";
+    
+    console.log('🔧 Creating Prisma Client with direct connection');
+    
+    prismaInstance = new PrismaClient({
+      datasourceUrl: connectionString,
+    });
+  }
+  return prismaInstance;
+}
+This completely bypasses environment variables and uses a direct connection string. It's not ideal for production but will get you working immediately.
+Try the datasourceUrl approach first, and if that doesn't work, use the hardcoded fallback. Let me know which works!

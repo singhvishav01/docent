@@ -26,7 +26,7 @@
   "dependencies": {
     "@prisma/client": "^5.0.0",
     "@zxing/browser": "^0.1.4",
-    "@zxing/library": "^0.20.0",
+    "@zxing/library": "^0.21.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.0.0",
     "jsonwebtoken": "^9.0.0",

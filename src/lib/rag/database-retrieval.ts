@@ -7,7 +7,14 @@ let prismaInstance: PrismaClient | null = null;
 
 function getPrismaClient(): PrismaClient {
   if (!prismaInstance) {
-    prismaInstance = new PrismaClient();
+    // HARDCODED FALLBACK - bypasses all .env issues
+    const connectionString = "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public";
+    
+    console.log('🔧 Creating Prisma Client with direct connection');
+    
+    prismaInstance = new PrismaClient({
+      datasourceUrl: connectionString,
+    });
   }
   return prismaInstance;
 }
@@ -20,9 +27,8 @@ export class DatabaseRetrieval {
     
     console.log('🔌 Initializing database-backed RAG system...');
     
-    // Test connection
     try {
-      const prisma = getPrismaClient(); // ← Use function instead
+      const prisma = getPrismaClient();
       await prisma.$connect();
       const museumCount = await prisma.museum.count();
       const artworkCount = await prisma.artwork.count();
