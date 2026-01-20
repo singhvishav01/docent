@@ -1,118 +1,91 @@
-// diagnostic.js - Run with: node diagnostic.js
-// This helps debug the DATABASE_URL and Prisma connection issues
+// verify-json.js - Run with: node verify-json.js
+// Verifies all museum JSON files are valid
 
-const { PrismaClient } = require('@prisma/client');
-require('dotenv').config({ path: '.env' });
+const fs = require('fs');
+const path = require('path');
 
-async function runDiagnostics() {
-  console.log('🔍 DOCENT Database Diagnostics\n');
-  console.log('='.repeat(60));
+function checkFile(filePath) {
+  console.log(`\n📄 Checking: ${filePath}`);
   
-  // 1. Check environment variables
-  console.log('\n1️⃣  ENVIRONMENT VARIABLES:');
-  console.log('-'.repeat(60));
-  console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
-  console.log('DATABASE_URL value:', process.env.DATABASE_URL || '❌ NOT SET');
-  console.log('NODE_ENV:', process.env.NODE_ENV || 'not set');
-  
-  // 2. Parse DATABASE_URL
-  console.log('\n2️⃣  DATABASE_URL PARSING:');
-  console.log('-'.repeat(60));
-  if (process.env.DATABASE_URL) {
-    try {
-      const url = new URL(process.env.DATABASE_URL);
-      console.log('✅ Protocol:', url.protocol);
-      console.log('✅ Host:', url.hostname);
-      console.log('✅ Port:', url.port);
-      console.log('✅ Database:', url.pathname.substring(1));
-      console.log('✅ Username:', url.username);
-      console.log('✅ Password:', url.password ? '***' : '(empty)');
-    } catch (error) {
-      console.error('❌ Invalid URL format:', error.message);
+  try {
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.log(`   ❌ File not found`);
+      return false;
     }
-  } else {
-    console.log('❌ DATABASE_URL not found in environment');
-  }
-  
-  // 3. Test Prisma Client creation
-  console.log('\n3️⃣  PRISMA CLIENT CREATION:');
-  console.log('-'.repeat(60));
-  let prisma;
-  try {
-    // Method 1: Default (uses schema.prisma binding)
-    console.log('Testing default PrismaClient...');
-    const prismaDefault = new PrismaClient();
-    console.log('✅ Default client created');
     
-    // Method 2: With datasourceUrl (bypasses schema)
-    console.log('Testing PrismaClient with datasourceUrl...');
-    prisma = new PrismaClient({
-      datasourceUrl: process.env.DATABASE_URL
-    });
-    console.log('✅ Client with datasourceUrl created');
-  } catch (error) {
-    console.error('❌ Client creation failed:', error.message);
-    process.exit(1);
-  }
-  
-  // 4. Test database connection
-  console.log('\n4️⃣  DATABASE CONNECTION TEST:');
-  console.log('-'.repeat(60));
-  try {
-    console.log('Attempting to connect...');
-    await prisma.$connect();
-    console.log('✅ Successfully connected to PostgreSQL');
+    // Read file
+    const rawData = fs.readFileSync(filePath, 'utf-8');
+    console.log(`   📊 Size: ${rawData.length} bytes`);
     
-    // 5. Test query
-    console.log('\n5️⃣  DATABASE QUERY TEST:');
-    console.log('-'.repeat(60));
-    const result = await prisma.$queryRaw`SELECT version()`;
-    console.log('✅ PostgreSQL version:', result[0].version);
+    // Check for BOM
+    const hasBOM = rawData.charCodeAt(0) === 0xFEFF;
+    if (hasBOM) {
+      console.log(`   ⚠️  BOM detected (will be removed automatically)`);
+    }
     
-    // 6. Check tables
-    console.log('\n6️⃣  SCHEMA CHECK:');
-    console.log('-'.repeat(60));
-    const tables = await prisma.$queryRaw`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-    `;
-    console.log('Tables in database:', tables.length);
-    tables.forEach(t => console.log('  -', t.table_name));
+    // Try to parse
+    const cleanData = rawData.replace(/^\uFEFF/, '').trim();
+    const parsed = JSON.parse(cleanData);
     
-    // 7. Check for artworks
-    console.log('\n7️⃣  DATA CHECK:');
-    console.log('-'.repeat(60));
-    const artworkCount = await prisma.artwork.count();
-    console.log('Artworks in database:', artworkCount);
+    console.log(`   ✅ Valid JSON`);
     
-    if (artworkCount > 0) {
-      const sampleArtwork = await prisma.artwork.findFirst();
-      console.log('Sample artwork:', {
-        id: sampleArtwork?.id,
-        title: sampleArtwork?.title,
-        artist: sampleArtwork?.artist
+    // Show structure
+    if (Array.isArray(parsed)) {
+      console.log(`   📦 Array with ${parsed.length} items`);
+    } else if (parsed.artworks) {
+      console.log(`   🏛️  Museum: ${parsed.name}`);
+      console.log(`   🎨 Artworks: ${parsed.artworks.length}`);
+      
+      // List artworks
+      parsed.artworks.forEach((art, idx) => {
+        console.log(`      ${idx + 1}. ${art.title} by ${art.artist} (ID: ${art.id})`);
       });
     } else {
-      console.log('⚠️  No artworks found - run: npm run db:seed');
+      console.log(`   📋 Object with keys: ${Object.keys(parsed).join(', ')}`);
     }
     
+    return true;
   } catch (error) {
-    console.error('❌ Connection failed:', error.message);
-    console.error('\nPossible causes:');
-    console.error('  1. PostgreSQL is not running (check Docker)');
-    console.error('  2. Wrong credentials in DATABASE_URL');
-    console.error('  3. Database "docent" does not exist');
-    console.error('  4. Prisma migrations not run');
-    console.error('\nTry:');
-    console.error('  docker-compose up -d');
-    console.error('  npx prisma migrate dev');
-  } finally {
-    await prisma.$disconnect();
+    console.log(`   ❌ ERROR: ${error.message}`);
+    return false;
   }
-  
-  console.log('\n' + '='.repeat(60));
-  console.log('✅ Diagnostics complete\n');
 }
 
-runDiagnostics().catch(console.error);
+console.log('🔍 DOCENT JSON Files Verification\n');
+console.log('='.repeat(60));
+
+const dataPath = path.join(process.cwd(), 'data', 'museums');
+console.log(`📂 Data path: ${dataPath}\n`);
+
+// Check if data directory exists
+if (!fs.existsSync(dataPath)) {
+  console.log(`❌ Data directory not found: ${dataPath}`);
+  console.log(`\nCreate it with: mkdir -p data/museums`);
+  process.exit(1);
+}
+
+// Files to check
+const files = [
+  'museums.json',
+  'met.json',
+  'moma.json',
+  'louvre.json',
+  'sample-museum.json'
+];
+
+let allValid = true;
+
+files.forEach(file => {
+  const filePath = path.join(dataPath, file);
+  const isValid = checkFile(filePath);
+  if (!isValid) allValid = false;
+});
+
+console.log('\n' + '='.repeat(60));
+if (allValid) {
+  console.log('✅ All JSON files are valid!\n');
+} else {
+  console.log('❌ Some JSON files have issues. Fix them before running the app.\n');
+  process.exit(1);
+}
