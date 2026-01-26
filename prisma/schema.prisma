@@ -6,8 +6,8 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL") // Add this line
+  url        = "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public"
+  directUrl  = "postgresql://postgres:docent_dev_password@127.0.0.1:5433/docent?schema=public"
   extensions = [pgvector(map: "vector")]
 }
 
