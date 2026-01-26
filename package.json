@@ -24,7 +24,7 @@
     "seed-dev": "SEED=1 npm run dev"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0",
+    "@prisma/client": "^5.22.0",
     "@zxing/browser": "^0.1.4",
     "@zxing/library": "^0.21.0",
     "bcryptjs": "^2.4.3",
