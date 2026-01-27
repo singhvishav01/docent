@@ -1,5 +1,6 @@
+// src/app/api/artworks/[id]/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getRAGInstance } from '@/lib/rag';
+import { db } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,8 +15,42 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rag = await getRAGInstance();
-    const results = await rag.searchArtworks(query, museumId || undefined);
+    console.log(`Searching artworks: query="${query}", museum=${museumId || 'all'}`);
+
+    // Search in database
+    const artworks = await db.artwork.findMany({
+      where: {
+        AND: [
+          museumId ? { museumId } : {},
+          {
+            OR: [
+              { title: { contains: query, mode: 'insensitive' } },
+              { artist: { contains: query, mode: 'insensitive' } },
+              { description: { contains: query, mode: 'insensitive' } }
+            ]
+          }
+        ]
+      },
+      include: {
+        museum: {
+          select: {
+            name: true
+          }
+        }
+      },
+      take: 10
+    });
+
+    const results = artworks.map(artwork => ({
+      id: artwork.id,
+      title: artwork.title,
+      artist: artwork.artist,
+      year: artwork.year,
+      museum: artwork.museumId,
+      museum_name: artwork.museum.name
+    }));
+
+    console.log(`Found ${results.length} results`);
 
     return NextResponse.json({
       query,

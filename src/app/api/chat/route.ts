@@ -2,8 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '../../../lib/auth';
-import { getRAGInstance } from '../../../lib/rag';
+import { db } from '../../../lib/db';
 import { createChatCompletion, ChatContext } from '../../../lib/openai';
+import { ChunkedArtwork } from '../../../lib/rag/embeddings';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { message, artworkId, museumId, query } = await req.json();
+    const { message, artworkId, museumId } = await req.json();
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -30,62 +31,112 @@ export async function POST(req: NextRequest) {
 
     console.log(`Chat request: artworkId=${artworkId}, museumId=${museumId}, message=${message.substring(0, 50)}...`);
 
-    const rag = await getRAGInstance();
-    let chunks;
-    let artwork = null;
-    let actualMuseumId = museumId; // Track the actual museum where artwork was found
+    let artwork: any = null;
+    let chunks: ChunkedArtwork[] = [];
 
-    // FIXED: Always try to get the specific artwork first if we have both IDs
-    if (artworkId) {
-      console.log(`Looking for specific artwork: ${artworkId} in museum: ${museumId}`);
+    // Load artwork from database
+    if (artworkId && museumId) {
+      console.log(`Looking for artwork: ${artworkId} in museum: ${museumId}`);
       
-      // First try the specified museum
-      if (museumId) {
-        artwork = await rag.getArtworkData(artworkId, museumId);
-      }
-      
-      // If not found, search all museums
-      if (!artwork) {
-        console.log(`Artwork ${artworkId} not found in museum ${museumId}, searching all museums`);
-        artwork = await rag.getArtworkData(artworkId); // This searches all museums
-        
-        if (artwork) {
-          actualMuseumId = artwork.museum; // Use the museum where it was actually found
-          console.log(`Found artwork: ${artwork.title} by ${artwork.artist} in museum: ${actualMuseumId}`);
+      artwork = await db.artwork.findFirst({
+        where: {
+          id: artworkId,
+          museumId: museumId
+        },
+        include: {
+          museum: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
         }
-      }
-      
+      });
+
       if (artwork) {
-        // Create focused search around this specific artwork using the correct museum
-        chunks = await rag.semanticSearch(
-          `${artwork.title} ${artwork.artist} ${message}`, 
-          actualMuseumId, 
-          3
-        );
+        console.log(`Found artwork: ${artwork.title} by ${artwork.artist}`);
+        
+        // Load curator notes for context
+        const curatorNotes = await db.curatorNote.findMany({
+          where: {
+            artworkId: artworkId,
+            museumId: museumId
+          },
+          include: {
+            curator: {
+              select: {
+                name: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 5 // Limit to most recent 5 notes
+        });
+
+        // Build context chunks from artwork and curator notes
+        chunks = [
+          {
+            id: artwork.id,
+            museumId: artwork.museumId,
+            chunkId: `${artwork.id}_core`,
+            content: `${artwork.title} by ${artwork.artist}${artwork.year ? ` (${artwork.year})` : ''}. ${artwork.description || ''}`,
+            metadata: {
+              title: artwork.title,
+              artist: artwork.artist,
+              year: artwork.year ?? undefined, // Convert null to undefined
+              location: artwork.gallery ?? undefined,
+              chunkType: 'description' as const
+            }
+          }
+        ];
+
+        // Add curator notes as chunks
+        curatorNotes.forEach((note, idx) => {
+          chunks.push({
+            id: artwork.id,
+            museumId: artwork.museumId,
+            chunkId: `${artwork.id}_curator_${idx}`,
+            content: `Curator note for ${artwork.title} (${note.type}): ${note.content}`,
+            metadata: {
+              title: artwork.title,
+              artist: artwork.artist,
+              year: artwork.year ?? undefined, // Convert null to undefined
+              location: artwork.gallery ?? undefined,
+              chunkType: 'curator_note' as const
+            }
+          });
+        });
+
+        console.log(`Built ${chunks.length} context chunks (1 core + ${curatorNotes.length} curator notes)`);
       } else {
-        console.log(`Artwork ${artworkId} not found in any museum, falling back to general search`);
-        // Fall back to general search if artwork not found
-        chunks = await rag.semanticSearch(message, museumId, 4);
+        console.log(`Artwork ${artworkId} not found in museum ${museumId}`);
       }
-    } else if (query && museumId) {
-      // Semantic search with query
-      chunks = await rag.semanticSearch(query, museumId, 5);
-    } else if (message) {
-      // Use the message as search query
-      chunks = await rag.semanticSearch(message, museumId, 4);
     }
+
+    // Format artwork data for OpenAI context
+    const artworkData = artwork ? {
+      id: artwork.id,
+      title: artwork.title,
+      artist: artwork.artist,
+      year: artwork.year,
+      medium: artwork.medium,
+      dimensions: artwork.dimensions,
+      description: artwork.description,
+      museum: artwork.museum.name,
+      museum_name: artwork.museum.name
+    } : null;
 
     const context: ChatContext = {
       messages: [{ role: 'user', content: message }],
       artworkId,
-      museumId: actualMuseumId, // Use the actual museum ID where artwork was found
-      query,
+      museumId,
       chunks,
-      // FIXED: Include the artwork data directly in context
-      artwork
+      artwork: artworkData
     };
 
-    // Get response as string instead of stream for now
+    // Get response as string
     const response = await createChatCompletion(context, {
       model: 'gpt-4o-mini',
       maxTokens: 600,
@@ -97,9 +148,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: response,
       context_used: chunks && chunks.length > 0,
-      curator_notes_count: chunks ? chunks.length : 0,
-      artwork: artwork, // Return the found artwork
-      actualMuseumId: actualMuseumId // Return the actual museum ID
+      curator_notes_count: chunks ? chunks.length - 1 : 0, // Subtract 1 for core chunk
+      artwork: artworkData,
+      actualMuseumId: museumId
     });
 
   } catch (error) {
