@@ -19,6 +19,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "import-json": "tsx scripts/import-json-to-db.ts",
+    "import-csv": "tsx scripts/import-csv-to-db.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "seed-dev": "SEED=1 npm run dev"
