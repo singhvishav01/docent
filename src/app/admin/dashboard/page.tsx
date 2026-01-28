@@ -163,6 +163,15 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        <Link
+  href="/admin/csv-upload"
+  className="flex items-center p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+>
+  <svg className="w-6 h-6 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  </svg>
+  <span className="font-medium text-indigo-900">Upload CSV</span>
+</Link>
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>

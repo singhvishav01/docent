@@ -149,6 +149,24 @@ export default function CuratorDashboard() {
             )}
           </div>
         </div>
+        {/* Quick Actions */}
+<div className="mt-8 bg-white rounded-lg shadow-sm p-6">
+  <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <Link
+      href="/admin/csv-upload"
+      className="flex items-center p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+    >
+      <svg className="w-6 h-6 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <div>
+        <span className="font-medium text-indigo-900 block">Upload Artworks CSV</span>
+        <span className="text-sm text-indigo-600">Bulk import artworks</span>
+      </div>
+    </Link>
+  </div>
+</div>
 
         {/* Quick Actions for Admins ONLY */}
         {currentUser?.role === 'admin' && (
