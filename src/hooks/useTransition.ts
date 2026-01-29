@@ -65,11 +65,17 @@ export function useTransition() {
     return managerRef.current?.getQueueStatus()
   }
 
+  // ADD THIS: Expose the onTransition method
+  const setOnTransition = (callback: (event: any) => void) => {
+    managerRef.current?.onTransition(callback)
+  }
+
   return {
     ...state,
     enqueue,
     forceTransition,
     clearQueue,
-    getQueueStatus
+    getQueueStatus,
+    setOnTransition // ADD THIS
   }
 }

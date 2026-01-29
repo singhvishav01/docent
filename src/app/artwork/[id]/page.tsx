@@ -94,7 +94,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
     };
 
     // Set up the transition callback
-    transition.onTransition?.(handleTransition);
+    transition.setOnTransition?.(handleTransition);
 
     return () => {
       // Cleanup if needed
