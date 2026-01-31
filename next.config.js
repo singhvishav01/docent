@@ -3,8 +3,13 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['prisma', '@prisma/client']
   },
-   images: {
-    domains: ['upload.wikimedia.org', 'images.metmuseum.org', 'localhost'], // ← ADD images.metmuseum.org
+  images: {
+    domains: [
+      'upload.wikimedia.org',
+      'images.metmuseum.org',
+      'collections.louvre.fr',  // ← ADDED for Louvre
+      'localhost'
+    ],
     remotePatterns: [
       {
         protocol: 'https',
@@ -14,7 +19,13 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'images.metmuseum.org', // ← ADD THIS
+        hostname: 'images.metmuseum.org',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'collections.louvre.fr',  // ← ADDED for Louvre
         port: '',
         pathname: '/**',
       }
