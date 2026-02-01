@@ -4,7 +4,7 @@
 import { notFound, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ChatInterface } from '@/components/chat/ChatInterface';
+import {  ChatInterfaceWithVoice as ChatInterface } from '@/components/chat/ChatInterface';
 import { QRScannerModal } from '@/components/qr/QRScannerModal';
 import { FloatingScanButton } from '@/components/qr/FloatingScanButton';
 import { TransitionIndicator } from '@/components/chat/TransitionIndicator';

@@ -1,9 +1,12 @@
-// src/components/chat/ChatInterface.tsx - FULLY RESPONSIVE
+// src/components/chat/ChatInterfaceWithVoice.tsx
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from './MessageBubble';
 import { SourceToggle } from './SourceToggle';
+import { WinstonVoiceManager, VoiceMode } from '@/lib/voice/WinstonVoiceManager';
+import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
+import { VoiceTourButton } from '../voice/VoiceTourButton';
 
 interface ChatMessage {
   id: string;
@@ -28,13 +31,25 @@ interface ChatInterfaceProps {
   onArtworkTransition?: (newArtworkId: string) => void;
 }
 
-export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArtworkTransition }: ChatInterfaceProps) {
+export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTitle, onArtworkTransition }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [currentArtwork, setCurrentArtwork] = useState<any>(null);
   const [actualMuseumId, setActualMuseumId] = useState<string>(museumId);
+  
+  // Voice state
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>('dormant');
+  const [isVoiceTourActive, setIsVoiceTourActive] = useState(false);
+  const [isInitializingVoice, setIsInitializingVoice] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  
+  // Use ref to avoid stale closure issues
+  const isVoiceTourActiveRef = useRef(false);
+  
+  const voiceManager = useRef<WinstonVoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,6 +61,12 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
     scrollToBottom();
   }, [messages]);
 
+  // Check voice support on mount
+  useEffect(() => {
+    setVoiceSupported(WinstonVoiceManager.isSupported());
+  }, []);
+
+  // Load artwork when artworkId changes
   useEffect(() => {
     const loadArtwork = async () => {
       try {
@@ -76,6 +97,11 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
           };
           
           setMessages([welcomeMessage]);
+          
+          // Notify voice manager of artwork change if active
+          if (isVoiceTourActive && voiceManager.current) {
+            voiceManager.current.onArtworkChange(artwork.id, artwork.title);
+          }
         }
       } catch (error) {
         console.error('Failed to load artwork:', error);
@@ -86,6 +112,92 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
       loadArtwork();
     }
   }, [artworkId, museumId]);
+
+  // Initialize voice manager
+  useEffect(() => {
+    if (!voiceManager.current && voiceSupported) {
+      voiceManager.current = new WinstonVoiceManager({
+        silenceTimeout: 30000 // 30 seconds
+      });
+
+      // Set up voice event listeners
+      voiceManager.current.onModeChanged((mode) => {
+        setVoiceMode(mode);
+      });
+
+      voiceManager.current.onTranscriptReceived((text, isFinal) => {
+        if (isFinal) {
+          setInterimTranscript('');
+          // Send the final transcript as a message
+          handleVoiceInput(text);
+        } else {
+          setInterimTranscript(text);
+        }
+      });
+
+      voiceManager.current.onErrorOccurred((error) => {
+        console.error('Voice error:', error);
+        if (error !== 'no-speech' && error !== 'aborted') {
+          // Show error to user
+          alert(`Voice recognition error: ${error}`);
+        }
+      });
+    }
+
+    return () => {
+      if (voiceManager.current) {
+        voiceManager.current.destroy();
+      }
+    };
+  }, [voiceSupported]);
+
+  const handleStartVoiceTour = async () => {
+    if (!voiceManager.current || !currentArtwork) return;
+
+    console.log('[ChatInterface] 🎬 Starting voice tour...');
+    setIsInitializingVoice(true);
+
+    try {
+      await voiceManager.current.startTour(currentArtwork.id, currentArtwork.title);
+      setIsVoiceTourActive(true);
+      isVoiceTourActiveRef.current = true; // Update ref too
+      console.log('[ChatInterface] ✅ Voice tour activated - isVoiceTourActive set to TRUE');
+    } catch (error) {
+      console.error('[ChatInterface] ❌ Failed to start voice tour:', error);
+      alert('Failed to start voice tour. Please check your microphone permissions.');
+    } finally {
+      setIsInitializingVoice(false);
+    }
+  };
+
+  const handleStopVoiceTour = () => {
+    console.log('[ChatInterface] 🛑 Stopping voice tour...');
+    if (voiceManager.current) {
+      voiceManager.current.stopTour();
+      setIsVoiceTourActive(false);
+      isVoiceTourActiveRef.current = false; // Update ref too
+      setInterimTranscript('');
+      console.log('[ChatInterface] ✅ Voice tour deactivated - isVoiceTourActive set to FALSE');
+    }
+  };
+
+  const handleVoiceInput = async (transcript: string) => {
+    if (!transcript.trim()) return;
+
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: `user-voice-${Date.now()}`,
+      content: transcript,
+      isUser: true,
+      role: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+
+    // Get AI response
+    await sendMessageToAI(transcript, true);
+  };
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -102,10 +214,23 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
     setInputMessage('');
     setIsLoading(true);
 
-    // Auto-resize textarea
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
+
+    await sendMessageToAI(userMessage.content, false);
+  };
+
+  const sendMessageToAI = async (content: string, isVoiceInput: boolean) => {
+    // Use ref to get current value, avoiding stale closure
+    const isVoiceActive = isVoiceTourActiveRef.current;
+    
+    console.log(`[ChatInterface] 📤 Sending message (voice: ${isVoiceInput}): "${content.substring(0, 50)}..."`);
+    console.log(`[ChatInterface] 🎤 Voice tour active (state): ${isVoiceTourActive}`);
+    console.log(`[ChatInterface] 🎤 Voice tour active (ref): ${isVoiceActive}`);
+    console.log(`[ChatInterface] 🎤 Voice manager exists: ${!!voiceManager.current}`);
+    
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/chat', {
@@ -114,7 +239,7 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: inputMessage,
+          message: content,
           artworkId,
           museumId: actualMuseumId,
           artworkTitle: currentArtwork?.title,
@@ -127,6 +252,7 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
       }
 
       const data = await response.json();
+      console.log(`[ChatInterface] 📥 Received response: "${data.response?.substring(0, 50)}..."`);
 
       if (data.actualMuseumId && data.actualMuseumId !== actualMuseumId) {
         setActualMuseumId(data.actualMuseumId);
@@ -149,8 +275,43 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
       };
 
       setMessages(prev => [...prev, aiMessage]);
+
+      // IMPORTANT: Use ref value to check if voice is active
+      if (isVoiceInput && voiceManager.current && isVoiceActive) {
+        console.log('[ChatInterface] 🎤 All conditions met - entering voice response mode');
+        console.log('[ChatInterface] 🎤 Voice mode active - will speak response');
+        setIsLoading(false); // Clear loading UI
+        
+        try {
+          console.log('[ChatInterface] 🔊 Calling speakWithInterruption()...');
+          const result = await voiceManager.current.speakWithInterruption(aiMessage.content);
+          
+          if (result === 'completed') {
+            console.log('[ChatInterface] ✅ Speaking completed without interruption');
+            // Resume listening after speaking completes
+            console.log('[ChatInterface] 🎤 Resuming listening...');
+            voiceManager.current.resumeListening();
+            console.log('[ChatInterface] ✅ Resume listening called');
+          } else {
+            console.log('[ChatInterface] 🛑 Speaking was interrupted by user');
+            console.log('[ChatInterface] ⏭️  New question already being processed, not resuming');
+            // Don't resume listening - the interruption already triggered a new question
+            // The new question is being processed through the normal flow
+          }
+        } catch (speechError) {
+          console.error('[ChatInterface] ❌ Speech error:', speechError);
+          // Even if speech fails, resume listening
+          console.log('[ChatInterface] 🔄 Resuming listening despite error...');
+          voiceManager.current.resumeListening();
+        }
+      } else {
+        console.log('[ChatInterface] 💬 Text mode - not speaking');
+        console.log('[ChatInterface] 💬 Reason: isVoiceInput=' + isVoiceInput + ', hasManager=' + !!voiceManager.current + ', isActive=' + isVoiceActive);
+        setIsLoading(false);
+      }
+
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('[ChatInterface] ❌ Chat error:', error);
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         content: 'I apologize, but I encountered an error. Please try again.',
@@ -159,8 +320,13 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
       setIsLoading(false);
+      
+      // Resume listening even after error - use ref value
+      if (isVoiceInput && voiceManager.current && isVoiceTourActiveRef.current) {
+        console.log('[ChatInterface] 🔄 Resuming listening after error...');
+        voiceManager.current.resumeListening();
+      }
     }
   };
 
@@ -171,11 +337,9 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
     }
   };
 
-  // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
     
-    // Auto-resize
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
@@ -197,6 +361,15 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
             )}
           </div>
           <div className="flex items-center gap-2 ml-4">
+            {voiceSupported && (
+              <VoiceTourButton
+                isActive={isVoiceTourActive}
+                isInitializing={isInitializingVoice}
+                onStart={handleStartVoiceTour}
+                onStop={handleStopVoiceTour}
+                disabled={!currentArtwork}
+              />
+            )}
             <SourceToggle 
               showSources={showSources} 
               onToggle={setShowSources}
@@ -206,19 +379,37 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
         </div>
 
         {/* Mobile Header */}
-        <div className="sm:hidden flex items-center justify-between p-3 border-b border-gray-100">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-800 truncate">
-              Chatting about: {currentArtwork?.title || 'Loading...'}
-            </p>
+        <div className="sm:hidden flex flex-col gap-2 p-3 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-800 truncate">
+                {currentArtwork?.title || 'Loading...'}
+              </p>
+            </div>
+            <SourceToggle 
+              showSources={showSources} 
+              onToggle={setShowSources}
+              curatorNotesCount={currentArtwork?.curator_notes?.length || 0}
+            />
           </div>
-          <SourceToggle 
-            showSources={showSources} 
-            onToggle={setShowSources}
-            curatorNotesCount={currentArtwork?.curator_notes?.length || 0}
-          />
+          {voiceSupported && (
+            <VoiceTourButton
+              isActive={isVoiceTourActive}
+              isInitializing={isInitializingVoice}
+              onStart={handleStartVoiceTour}
+              onStop={handleStopVoiceTour}
+              disabled={!currentArtwork}
+            />
+          )}
         </div>
       </div>
+
+      {/* Voice Mode Indicator */}
+      {isVoiceTourActive && (
+        <div className="flex-shrink-0 p-3 border-b border-gray-100">
+          <VoiceModeIndicator mode={voiceMode} interimTranscript={interimTranscript} />
+        </div>
+      )}
 
       {/* ==================== MESSAGES ==================== */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
@@ -245,7 +436,7 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
         </div>
       </div>
 
-      {/* ==================== SOURCE PANEL (collapsible) ==================== */}
+      {/* ==================== SOURCE PANEL ==================== */}
       {showSources && currentArtwork && (
         <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 max-h-40 overflow-y-auto">
           <div className="p-3 sm:p-4">
@@ -264,13 +455,25 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
       {/* ==================== INPUT ==================== */}
       <div className="flex-shrink-0 border-t border-gray-200 bg-white">
         <div className="p-3 sm:p-4">
+          {isVoiceTourActive ? (
+            <div className="text-center py-2 text-sm text-gray-500">
+              <p>Voice tour active - speak naturally or type below</p>
+            </div>
+          ) : null}
+          
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
-              placeholder={currentArtwork ? `Ask about "${currentArtwork.title}"...` : "Ask me anything..."}
+              placeholder={
+                isVoiceTourActive 
+                  ? "Speak or type your question..." 
+                  : currentArtwork 
+                    ? `Ask about "${currentArtwork.title}"...` 
+                    : "Ask me anything..."
+              }
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base min-h-[44px] max-h-[120px]"
               disabled={isLoading}
               rows={1}
@@ -284,10 +487,6 @@ export function ChatInterface({ artworkId, museumId = 'met', artworkTitle, onArt
               Send
             </button>
           </div>
-          {/* Mobile helper text */}
-          <p className="text-xs text-gray-500 mt-2 sm:hidden">
-            Shift + Enter for new line
-          </p>
         </div>
       </div>
     </div>
