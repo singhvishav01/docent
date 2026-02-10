@@ -8,6 +8,8 @@
  * - Context-aware responses
  */
 
+import { Public } from "@prisma/client/runtime/library";
+
 export type VoiceMode = 'dormant' | 'listening' | 'thinking' | 'speaking';
 
 export interface VoiceConfig {
@@ -321,7 +323,7 @@ export class WinstonVoiceManager {
   /**
    * Stop listening
    */
-  private stopListening(): void {
+  public stopListening(): void {
     if (this.recognition && this.mode === 'listening') {
       try {
         this.recognition.stop();
@@ -650,7 +652,7 @@ export class WinstonVoiceManager {
   /**
    * Stop current speech
    */
-  private stopSpeaking(): void {
+  public stopSpeaking(): void {
     if (this.synthesis.speaking) {
       this.synthesis.cancel();
       this.currentUtterance = null;

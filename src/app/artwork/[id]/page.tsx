@@ -1,10 +1,11 @@
-// src/app/artwork/[id]/page.tsx - FULLY RESPONSIVE VERSION
+// src/app/artwork/[id]/page.tsx - WITH PERSISTENT CHAT
 'use client';
 
 import { notFound, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import {  ChatInterfaceWithVoice as ChatInterface } from '@/components/chat/ChatInterface';
+import { SessionProvider } from '@/contexts/SessionProvider';
+import { PersistentChatInterface } from '@/components/chat/PersistentChatInterface';
 import { QRScannerModal } from '@/components/qr/QRScannerModal';
 import { FloatingScanButton } from '@/components/qr/FloatingScanButton';
 import { TransitionIndicator } from '@/components/chat/TransitionIndicator';
@@ -15,7 +16,7 @@ interface ArtworkPageProps {
   searchParams: { museum?: string };
 }
 
-export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) {
+function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
   const router = useRouter();
   const artworkId = params.id;
   const museumId = searchParams.museum || 'met';
@@ -289,10 +290,12 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
 
             {/* Chat - Takes remaining space */}
             <div className="flex-1 min-h-0">
-              <ChatInterface 
+              <PersistentChatInterface 
                 artworkId={artworkId}
                 museumId={museumId}
                 artworkTitle={artwork.title}
+                artworkArtist={artwork.artist}
+                artworkYear={artwork.year}
               />
             </div>
           </div>
@@ -367,10 +370,12 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
 
               {/* Chat - Takes remaining height */}
               <div className="flex-1 min-h-0 bg-white rounded-lg shadow-sm overflow-hidden">
-                <ChatInterface 
+                <PersistentChatInterface 
                   artworkId={artworkId}
                   museumId={museumId}
                   artworkTitle={artwork.title}
+                  artworkArtist={artwork.artist}
+                  artworkYear={artwork.year}
                 />
               </div>
             </div>
@@ -463,10 +468,12 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
             {/* Right Column: Chat (Sticky) */}
             <div className="sticky top-24 h-[calc(100vh-7rem)]">
               <div className="h-full bg-white rounded-lg shadow-lg overflow-hidden">
-                <ChatInterface 
+                <PersistentChatInterface 
                   artworkId={artworkId}
                   museumId={museumId}
                   artworkTitle={artwork.title}
+                  artworkArtist={artwork.artist}
+                  artworkYear={artwork.year}
                 />
               </div>
             </div>
@@ -490,5 +497,14 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
         currentArtworkId={artworkId}
       />
     </div>
+  );
+}
+
+// Wrap the entire page in SessionProvider
+export default function ArtworkPage(props: ArtworkPageProps) {
+  return (
+    <SessionProvider>
+      <ArtworkPageContent {...props} />
+    </SessionProvider>
   );
 }
