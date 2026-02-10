@@ -9,7 +9,7 @@ import { Camera, CameraOff, RotateCcw, CheckCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 interface QRScannerPanelProps {
-  onQRCodeDetected: (qrContent: string) => void
+  onQRCodeDetected: (artworkId: string) => void  // Changed: now expects just artwork ID
   currentArtworkId: string
 }
 
@@ -144,19 +144,11 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
       setIsProcessing(true)
       setLastScannedCode(qrContent)
       
-      // Parse QR code content - expecting artwork ID or JSON with artwork info
-      let artworkId: string
-      
-      try {
-        const parsed = JSON.parse(qrContent)
-        artworkId = parsed.artworkId || parsed.id
-      } catch {
-        // Assume it's a direct artwork ID
-        artworkId = qrContent.trim()
-      }
+      // QR codes now contain simple artwork IDs (e.g., "washington_crossing", "starry_night")
+      const artworkId = qrContent.trim()
 
       if (!artworkId) {
-        toast.error('Invalid QR code format')
+        toast.error('Invalid QR code - empty content')
         return
       }
 
@@ -166,10 +158,10 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
         return
       }
 
-      toast.success(`Transitioning to new artwork...`)
+      toast.success(`Loading artwork...`)
       
-      // Call the parent's handler for seamless transition
-      await onQRCodeDetected(qrContent)
+      // Pass the artwork ID to the parent handler
+      await onQRCodeDetected(artworkId)
       
     } catch (error) {
       console.error('QR code parsing error:', error)
@@ -200,7 +192,7 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
         <div>
           <h4 className="font-medium text-gray-900 mb-2">Camera Access Required</h4>
           <p className="text-xs text-gray-600 mb-4">
-            Enable camera access to scan QR codes for artwork transitions.
+            Enable camera access to scan QR codes for artworks.
           </p>
           <Button onClick={initializeScanner} size="sm">
             <Camera className="w-4 h-4 mr-2" />
@@ -249,7 +241,7 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
           
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-              {isProcessing ? 'Processing...' : 'Position QR code here'}
+              {isProcessing ? 'Processing...' : 'Scan artwork QR code'}
             </div>
           </div>
         </div>
@@ -290,7 +282,7 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
       {isScanning && (
         <div className="text-center">
           <p className="text-xs text-gray-600">
-            Scan the QR code next to an artwork to transition
+            QR code contains artwork ID (e.g., "washington_crossing")
           </p>
           {devices.length > 1 && (
             <p className="text-xs text-gray-500 mt-1">

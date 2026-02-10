@@ -83,22 +83,21 @@ export default function QRCodesPage() {
     }
   };
 
-  const getQRUrl = (artworkId: string, museumId: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/artwork/${artworkId}?museum=${museumId}`;
-  };
 
   const getQRSize = () => {
     if (selectedSize === 'custom') return customSize;
     return QR_SIZE_PRESETS[selectedSize].pixels;
   };
 
-  const generateQRCode = async (artworkId: string, museumId: string): Promise<string> => {
-    const url = getQRUrl(artworkId, museumId);
+   const generateQRCode = async (artworkId: string, museumId: string): Promise<string> => {
+    // NEW: QR codes now contain just the artwork ID (not the full URL)
+    // This makes them work everywhere, including the initial /scan page
+    const qrContent = artworkId;  // Simple! Just use the artwork ID
+    
     const size = getQRSize();
     
     try {
-      const dataUrl = await QRCode.toDataURL(url, {
+      const dataUrl = await QRCode.toDataURL(qrContent, {
         width: size,
         margin: 2,
         errorCorrectionLevel: 'H',
@@ -480,8 +479,9 @@ export default function QRCodesPage() {
                         {artwork.artist} {artwork.year && `• ${artwork.year}`}
                       </p>
                       <p className="text-xs text-gray-500 font-mono">
-                        {getQRUrl(artwork.id, artwork.museum)}
+                        ID: {artwork.id}
                       </p>
+               
                     </div>
 
                     {/* Action Buttons */}

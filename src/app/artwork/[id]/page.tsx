@@ -92,57 +92,51 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
     return () => {};
   };
 
-  const handleQRDetected = async (qrContent: string) => {
+  // This is the updated handleQRDetected function for the artwork page
+  // Replace the existing handleQRDetected in src/app/artwork/[id]/page.tsx
+  
+  const handleQRDetected = async (artworkId: string) => {
     try {
-      console.log('QR Code detected:', qrContent);
+      console.log('[ArtworkPage] QR Code detected - Artwork ID:', artworkId)
       
-      let newArtworkId: string;
-      let newMuseumId: string = museumId;
-      
-      try {
-        const parsed = JSON.parse(qrContent);
-        newArtworkId = parsed.artworkId || parsed.id;
-        newMuseumId = parsed.museum || museumId;
-      } catch {
-        try {
-          const url = new URL(qrContent);
-          const pathParts = url.pathname.split('/');
-          newArtworkId = pathParts[pathParts.length - 1];
-          newMuseumId = url.searchParams.get('museum') || museumId;
-        } catch {
-          newArtworkId = qrContent.trim();
-        }
-      }
+      // The QR code now contains just the artwork ID (e.g., "washington_crossing")
+      const newArtworkId = artworkId.trim()
 
       if (!newArtworkId) {
-        console.error('Could not parse artwork ID from QR code');
-        return;
+        console.error('[ArtworkPage] Empty artwork ID from QR code')
+        alert('Invalid QR code - empty content')
+        return
       }
 
-      setScannerOpen(false);
+      setScannerOpen(false)
 
+      // Don't transition if it's the same artwork
       if (newArtworkId === artworkId) {
-        console.log('Same artwork, ignoring');
-        return;
+        console.log('[ArtworkPage] Same artwork, ignoring')
+        return
       }
 
+      // Verify the artwork exists before transitioning
       try {
-        const response = await fetch(`/api/artworks/${newArtworkId}?museum=${newMuseumId}`);
+        const response = await fetch(`/api/artworks/${newArtworkId}?museum=${museumId}`)
         if (!response.ok) {
-          console.error('Artwork not found:', newArtworkId);
-          alert('Artwork not found. Please try scanning again.');
-          return;
+          console.error('[ArtworkPage] Artwork not found:', newArtworkId)
+          alert(`Artwork "${newArtworkId}" not found. Please try scanning again.`)
+          return
         }
       } catch (error) {
-        console.error('Error verifying artwork:', error);
-        return;
+        console.error('[ArtworkPage] Error verifying artwork:', error)
+        alert('Error loading artwork. Please try again.')
+        return
       }
 
-      transition.enqueue(newArtworkId);
+      // Queue the transition
+      console.log('[ArtworkPage] Queueing transition to:', newArtworkId)
+      transition.enqueue(newArtworkId)
       
     } catch (error) {
-      console.error('Error handling QR code:', error);
-      alert('Error processing QR code. Please try again.');
+      console.error('[ArtworkPage] Error handling QR code:', error)
+      alert('Error processing QR code. Please try again.')
     }
   };
 
