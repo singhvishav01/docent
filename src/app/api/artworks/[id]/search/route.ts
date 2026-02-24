@@ -1,67 +1,49 @@
-// src/app/api/artworks/[id]/search/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+// API Route: src/app/api/artworks/lookup/[id]/route.ts
+// This endpoint looks up an artwork by ID and returns which museum it belongs to
 
-export async function GET(req: NextRequest) {
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const { searchParams } = new URL(req.url);
-    const query = searchParams.get('q');
-    const museumId = searchParams.get('museum');
+    const artworkId = params.id
 
-    if (!query) {
+    // Query ALL museums to find which one has this artwork
+    // This is efficient because artwork IDs are unique across museums
+    const artwork = await db.artwork.findFirst({
+      where: {
+        id: artworkId
+      },
+      select: {
+        id: true,
+        museumId: true,
+        title: true,
+        artist: true
+      }
+    })
+
+    if (!artwork) {
       return NextResponse.json(
-        { error: 'Search query is required' },
-        { status: 400 }
-      );
+        { error: 'Artwork not found in any museum' },
+        { status: 404 }
+      )
     }
 
-    console.log(`Searching artworks: query="${query}", museum=${museumId || 'all'}`);
-
-    // Search in database
-    const artworks = await db.artwork.findMany({
-      where: {
-        AND: [
-          museumId ? { museumId } : {},
-          {
-            OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { artist: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } }
-            ]
-          }
-        ]
-      },
-      include: {
-        museum: {
-          select: {
-            name: true
-          }
-        }
-      },
-      take: 10
-    });
-
-    const results = artworks.map(artwork => ({
-      id: artwork.id,
-      title: artwork.title,
-      artist: artwork.artist,
-      year: artwork.year,
-      museum: artwork.museumId,
-      museum_name: artwork.museum.name
-    }));
-
-    console.log(`Found ${results.length} results`);
-
     return NextResponse.json({
-      query,
-      results,
-      count: results.length
-    });
+      id: artwork.id,
+      museum: artwork.museumId,
+      title: artwork.title,
+      artist: artwork.artist
+    })
+
   } catch (error) {
-    console.error('Search API error:', error);
+    console.error('[Artwork Lookup API] Error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to lookup artwork' },
       { status: 500 }
-    );
+    )
   }
 }

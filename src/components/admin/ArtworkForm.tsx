@@ -31,7 +31,7 @@ export function ArtworkForm({ artwork, museums, onSubmit, onCancel, isEditing = 
   const [curatorNotes, setCuratorNotes] = useState<CuratorNote[]>(artwork?.curator_notes || []);
   const [newNote, setNewNote] = useState({ content: '', type: 'interpretation' as 'interpretation' | 'historical_context' | 'technical_analysis' | 'visitor_info' });
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string,  string>>({});
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};

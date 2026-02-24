@@ -45,4 +45,4 @@ export function FloatingScanButton({ onClick, isScanning = false }: FloatingScan
       )}
     </button>
   );
-}
+}                                                      

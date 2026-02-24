@@ -95,12 +95,12 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
   // This is the updated handleQRDetected function for the artwork page
   // Replace the existing handleQRDetected in src/app/artwork/[id]/page.tsx
   
-  const handleQRDetected = async (artworkId: string) => {
+  const handleQRDetected = async (scannedArtworkId: string) => {
     try {
-      console.log('[ArtworkPage] QR Code detected - Artwork ID:', artworkId)
+      console.log('[ArtworkPage] QR Code detected - Artwork ID:', scannedArtworkId)
       
-      // The QR code now contains just the artwork ID (e.g., "washington_crossing")
-      const newArtworkId = artworkId.trim()
+      // The QR code contains just the artwork ID (e.g., "liberty_leading_the_people")
+      const newArtworkId = scannedArtworkId.trim()
 
       if (!newArtworkId) {
         console.error('[ArtworkPage] Empty artwork ID from QR code')
@@ -110,27 +110,45 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
 
       setScannerOpen(false)
 
-      // Don't transition if it's the same artwork
-      if (newArtworkId === artworkId) {
+      // FIX #1: Compare against the CURRENT artwork ID from the page params
+      // (The page should have the current artworkId available from params)
+      const currentArtworkId = params.id // or however you access the current artwork ID
+      
+      if (newArtworkId === currentArtworkId) {
         console.log('[ArtworkPage] Same artwork, ignoring')
         return
       }
 
-      // Verify the artwork exists before transitioning
+      // FIX #2: Lookup which museum the new artwork belongs to
       try {
-        const response = await fetch(`/api/artworks/${newArtworkId}?museum=${museumId}`)
-        if (!response.ok) {
+        const lookupResponse = await fetch(`/api/artworks/lookup/${newArtworkId}`)
+        
+        if (!lookupResponse.ok) {
           console.error('[ArtworkPage] Artwork not found:', newArtworkId)
           alert(`Artwork "${newArtworkId}" not found. Please try scanning again.`)
           return
         }
+
+        const artworkInfo = await lookupResponse.json()
+        const correctMuseum = artworkInfo.museum
+        
+        console.log('[ArtworkPage] Found artwork in museum:', correctMuseum)
+
+        // Verify the artwork exists in its museum
+        const verifyResponse = await fetch(`/api/artworks/${newArtworkId}?museum=${correctMuseum}`)
+        if (!verifyResponse.ok) {
+          console.error('[ArtworkPage] Artwork verification failed')
+          alert('Error loading artwork. Please try again.')
+          return
+        }
+
       } catch (error) {
-        console.error('[ArtworkPage] Error verifying artwork:', error)
+        console.error('[ArtworkPage] Error looking up artwork:', error)
         alert('Error loading artwork. Please try again.')
         return
       }
 
-      // Queue the transition
+      // Queue the transition to the new artwork
       console.log('[ArtworkPage] Queueing transition to:', newArtworkId)
       transition.enqueue(newArtworkId)
       
