@@ -2,6 +2,7 @@
 import OpenAI from 'openai';
 import { ChunkedArtwork } from './rag/embeddings';
 import { ArtworkData } from './rag/types';
+import { DOCENT_PERSONA, DOCENT_VOICE_PERSONA } from './docent-persona';
 
 export interface ChatContext {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -91,42 +92,32 @@ export function trimChatHistory(
   return trimmedMessages;
 }
 
-export function buildSystemPrompt(context: CompactGroundingContext, artwork?: ArtworkData | null): string {
-  const artworksList = context.artworkTitles.length > 0 
-    ? `Available artworks: ${context.artworkTitles.join(', ')}`
-    : '';
+export function buildSystemPrompt(
+  context: CompactGroundingContext,
+  artwork?: ArtworkData | null,
+  voice = false
+): string {
+  const persona = voice ? DOCENT_VOICE_PERSONA : DOCENT_PERSONA;
 
-  // Add specific artwork context if available
   let artworkContext = '';
   if (artwork) {
     artworkContext = `
-
-CURRENT ARTWORK CONTEXT:
-Title: ${artwork.title}
-Artist: ${artwork.artist}
-${artwork.year ? `Year: ${artwork.year}` : ''}
-${artwork.medium ? `Medium: ${artwork.medium}` : ''}
-${artwork.description ? `Description: ${artwork.description}` : ''}
+CURRENT ARTWORK
+Title:  ${artwork.title}
+Artist: ${artwork.artist}${artwork.year ? `\nYear:   ${artwork.year}` : ''}${artwork.medium ? `\nMedium: ${artwork.medium}` : ''}${artwork.description ? `\nNotes:  ${artwork.description}` : ''}
 Museum: ${artwork.museum_name || artwork.museum}`;
   }
 
-  return `You are a knowledgeable museum guide assistant. Help visitors understand and appreciate the artworks they're viewing.
+  const groundingSection = context.relevantChunks.length > 0
+    ? `\nKNOWLEDGE BASE (use as your primary source — do not stray beyond it):\n${context.relevantChunks.join('\n\n')}`
+    : '';
 
-${artworksList}${artworkContext}
+  return `${persona}
+${artworkContext}
+${groundingSection}
 
-RELEVANT INFORMATION:
-${context.relevantChunks.join('\n\n')}
-
-INSTRUCTIONS:
-- Provide engaging, educational responses about the artworks
-- Use the provided information as your primary source
-- Focus on the current artwork context when available
-- If asked about artworks not in the provided information, politely explain you don't have details about those specific pieces
-- Keep responses conversational but informative
-- Encourage deeper engagement with the artworks
-- If technical details aren't provided, focus on visual elements and artistic significance
-
-Respond naturally and helpfully to the visitor's questions.`;
+If the visitor asks about an artwork you have no information on, say so naturally
+and redirect to what you do know. Never invent facts.`;
 }
 
 // Modified to support both streaming and non-streaming responses
@@ -138,7 +129,8 @@ export async function createChatCompletion(
     temperature?: number;
     groundingTokenLimit?: number;
     historyTokenLimit?: number;
-    stream?: boolean; // Added stream option
+    stream?: boolean;
+    voice?: boolean; // true → use voice-optimised persona
   } = {}
 ): Promise<ReadableStream | string> {
   const {
@@ -147,7 +139,8 @@ export async function createChatCompletion(
     temperature = 0.7,
     groundingTokenLimit = 1200,
     historyTokenLimit = 2000,
-    stream = true // Default to streaming
+    stream = true,
+    voice = false,
   } = options;
 
   const openai = new OpenAI({
@@ -163,8 +156,8 @@ export async function createChatCompletion(
     // Trim chat history
     const trimmedHistory = trimChatHistory(context.messages, historyTokenLimit);
 
-    // Build system prompt with artwork context
-    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork);
+    // Build system prompt with artwork context — voice mode uses shorter, spoken-rhythm prompt
+    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice || stream);
 
     console.log(`Token usage estimate - System: ${estimateTokens(systemPrompt)}, History: ${estimateTokens(JSON.stringify(trimmedHistory))}, Grounding: ${groundingContext.totalTokensEstimate}`);
 

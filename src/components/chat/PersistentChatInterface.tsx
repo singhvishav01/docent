@@ -117,9 +117,10 @@ export function PersistentChatInterface({
       isTransitioningRef.current = true;
 
       try {
-        // Stop any ongoing speech immediately
+        // Let the current sentence finish naturally, drop everything else
         if (voiceManager.current && voiceMode === 'speaking') {
-          voiceManager.current.stopSpeaking();
+          voiceManager.current.clearQueueKeepCurrent();
+          await voiceManager.current.waitForCurrentSentence(4000);
         }
 
         // Collect last few messages for context (previous artwork's conversation)
@@ -176,13 +177,8 @@ export function PersistentChatInterface({
 
         // Speak it if voice tour is active
         if (session.isVoiceTourActive && voiceManager.current) {
-          try {
-            await voiceManager.current.speak(transitionText);
-            voiceManager.current.resumeListening();
-          } catch (speechErr) {
-            console.error('[PersistentChat] ❌ Transition speech error:', speechErr);
-            voiceManager.current.resumeListening();
-          }
+          voiceManager.current.enqueueSentence(transitionText);
+          voiceManager.current.finalizeQueue();
         }
       } catch (error) {
         console.error('[PersistentChat] ❌ Transition error:', error);
@@ -318,87 +314,140 @@ export function PersistentChatInterface({
   };
 
   const sendMessageToAI = async (content: string, isVoiceInput: boolean) => {
-    console.log(`[PersistentChat] 📤 Sending message (voice: ${isVoiceInput}): "${content.substring(0, 50)}..."`);
-    console.log(`[PersistentChat] 🎤 Voice tour active: ${session.isVoiceTourActive}`);
-    
+    console.log(`[PersistentChat] 📤 Sending (voice: ${isVoiceInput}): "${content.substring(0, 50)}..."`);
+
+    const useStreaming = isVoiceInput && session.isVoiceTourActive && !!voiceManager.current;
     setIsLoading(true);
+
+    // Build conversation history for this artwork — last 8 messages gives enough
+    // context for the AI to understand short replies like "yes", "yep", "go on"
+    const conversationHistory = session.messages
+      .filter(m => m.artworkId === artworkId)
+      .slice(-8)
+      .map(m => ({ role: m.role, content: m.content }));
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
           artworkId,
           museumId: actualMuseumId,
           artworkTitle: currentArtwork?.title,
-          artworkArtist: currentArtwork?.artist
+          artworkArtist: currentArtwork?.artist,
+          stream: useStreaming,
+          conversationHistory,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Chat API error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Chat API error: ${response.status}`);
 
-      const data = await response.json();
-      console.log(`[PersistentChat] 📥 Received response: "${data.response?.substring(0, 50)}..."`);
-
-      if (data.actualMuseumId && data.actualMuseumId !== actualMuseumId) {
-        setActualMuseumId(data.actualMuseumId);
-      }
-
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        content: data.response || 'I apologize, but I received an empty response. Please try again.',
-        isUser: false,
-        role: 'assistant',
-        timestamp: new Date(),
-        artworkId: artworkId,
-        artworkInfo: data.artwork ? {
-          id: data.artwork.id,
-          title: data.artwork.title,
-          artist: data.artwork.artist,
-          year: data.artwork.year
-        } : undefined,
-        contextUsed: data.context_used,
-        curatorNotesCount: data.curator_notes_count
-      };
-
-      session.addMessage(aiMessage);
-
-      // Handle voice response
-      if (isVoiceInput && voiceManager.current && session.isVoiceTourActive) {
-        console.log('[PersistentChat] 🎤 Voice mode - speaking response');
+      if (useStreaming && voiceManager.current) {
+        // ── STREAMING VOICE PATH ─────────────────────────────────────────────
+        // Speech starts on the very first complete sentence while the rest
+        // of the response is still being generated.
         setIsLoading(false);
 
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let sentenceBuffer = '';
+
+        const extractSentences = (text: string): { sentences: string[]; remaining: string } => {
+          const sentences: string[] = [];
+          // Match any run of text ending with .!? (optionally followed by closing quote)
+          const re = /[^.!?]+[.!?]["']?/g;
+          let lastIndex = 0;
+          let m: RegExpExecArray | null;
+          while ((m = re.exec(text)) !== null) {
+            const s = m[0].trim();
+            if (s.length > 1) sentences.push(s);
+            lastIndex = m.index + m[0].length;
+          }
+          return { sentences, remaining: text.slice(lastIndex) };
+        };
+
         try {
-          await voiceManager.current.speakWithInterruption(aiMessage.content);
-          console.log('[PersistentChat] ✅ Speaking completed');
-        } catch (speechError) {
-          console.error('[PersistentChat] ❌ Speech error:', speechError);
-        } finally {
-          // Always resume listening — whether speech completed, was interrupted, or errored
-          voiceManager.current.resumeListening();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullText += chunk;
+            sentenceBuffer += chunk;
+
+            const { sentences, remaining } = extractSentences(sentenceBuffer);
+            sentenceBuffer = remaining;
+            for (const s of sentences) {
+              voiceManager.current!.enqueueSentence(s);
+            }
+          }
+
+          // Speak any trailing text that didn't end with punctuation
+          if (sentenceBuffer.trim()) {
+            voiceManager.current!.enqueueSentence(sentenceBuffer.trim());
+          }
+        } catch (streamErr) {
+          console.error('[PersistentChat] ❌ Stream read error:', streamErr);
         }
+
+        // Signal end of response — queue will resume listening once empty
+        voiceManager.current!.finalizeQueue();
+
+        // Add the complete message to chat
+        if (fullText.trim()) {
+          const aiMessage: ChatMessage = {
+            id: `ai-${Date.now()}`,
+            content: fullText.trim(),
+            isUser: false,
+            role: 'assistant',
+            timestamp: new Date(),
+            artworkId,
+          };
+          session.addMessage(aiMessage);
+        }
+
       } else {
+        // ── NON-STREAMING TEXT PATH ──────────────────────────────────────────
+        const data = await response.json();
+        console.log(`[PersistentChat] 📥 Received: "${data.response?.substring(0, 50)}..."`);
+
+        if (data.actualMuseumId && data.actualMuseumId !== actualMuseumId) {
+          setActualMuseumId(data.actualMuseumId);
+        }
+
+        const aiMessage: ChatMessage = {
+          id: `ai-${Date.now()}`,
+          content: data.response || 'I apologize, but I received an empty response. Please try again.',
+          isUser: false,
+          role: 'assistant',
+          timestamp: new Date(),
+          artworkId,
+          artworkInfo: data.artwork ? {
+            id: data.artwork.id,
+            title: data.artwork.title,
+            artist: data.artwork.artist,
+            year: data.artwork.year,
+          } : undefined,
+          contextUsed: data.context_used,
+          curatorNotesCount: data.curator_notes_count,
+        };
+
+        session.addMessage(aiMessage);
         setIsLoading(false);
       }
 
     } catch (error) {
       console.error('[PersistentChat] ❌ Chat error:', error);
-      const errorMessage: ChatMessage = {
+      session.addMessage({
         id: `error-${Date.now()}`,
         content: 'I apologize, but I encountered an error. Please try again.',
         isUser: false,
         role: 'assistant',
         timestamp: new Date(),
-        artworkId: artworkId
-      };
-      session.addMessage(errorMessage);
+        artworkId,
+      });
       setIsLoading(false);
-      
       if (isVoiceInput && voiceManager.current && session.isVoiceTourActive) {
         voiceManager.current.resumeListening();
       }

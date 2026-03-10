@@ -23,7 +23,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { message, artworkId, museumId } = await req.json();
+    const {
+      message,
+      artworkId,
+      museumId,
+      stream: useStream = false,
+      conversationHistory = [],
+    } = await req.json();
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -128,27 +134,55 @@ export async function POST(req: NextRequest) {
       museum_name: artwork.museum.name
     } : null;
 
+    // Prepend conversation history so the AI understands short replies like "yep" or "go on"
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      ...conversationHistory.map((m: any) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user' as const, content: message },
+    ];
+
     const context: ChatContext = {
-      messages: [{ role: 'user', content: message }],
+      messages,
       artworkId,
       museumId,
       chunks,
       artwork: artworkData
     };
 
-    // Get response as string
+    if (useStream) {
+      // Streaming path — pipes raw text deltas directly to the client
+      const streamResult = await createChatCompletion(context, {
+        model: 'gpt-4o-mini',
+        maxTokens: 500,   // Voice answers should be concise
+        groundingTokenLimit: 1000,
+        historyTokenLimit: 1500,
+        stream: true,
+        voice: true,
+      }) as ReadableStream;
+
+      return new Response(streamResult, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
+
+    // Non-streaming path (text mode) — returns full JSON response
     const response = await createChatCompletion(context, {
       model: 'gpt-4o-mini',
       maxTokens: 600,
       groundingTokenLimit: 1000,
       historyTokenLimit: 1500,
-      stream: false
+      stream: false,
     });
 
     return NextResponse.json({
       response: response,
       context_used: chunks && chunks.length > 0,
-      curator_notes_count: chunks ? chunks.length - 1 : 0, // Subtract 1 for core chunk
+      curator_notes_count: chunks ? chunks.length - 1 : 0,
       artwork: artworkData,
       actualMuseumId: museumId
     });

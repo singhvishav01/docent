@@ -998,6 +998,11 @@ export class WinstonVoiceManager {
   private isInitialized = false;
   private currentArtwork: { id: string; title: string } | null = null;
 
+  // Sentence queue — enables speaking sentence-by-sentence as text streams in
+  private sentenceQueue: string[] = [];
+  private isProcessingQueue = false;
+  private queueFinalized = false;
+
   constructor(config: VoiceConfig = {}) {
   this.silenceTimeout = config.silenceTimeout || 30000;
   
@@ -1400,8 +1405,9 @@ export class WinstonVoiceManager {
 
   private handleInterruption(transcript: string, isFinal: boolean): void {
     console.log(`[Voice] 🚨 Interrupted: "${transcript}"`);
-    
+
     this.stopSpeaking();
+    this.sentenceQueue = []; // Drop all pending sentences
     
     if (isFinal && transcript.trim().length > 0) {
       console.log(`[Voice] Processing`);
@@ -1419,9 +1425,98 @@ export class WinstonVoiceManager {
     }
   }
 
+  // ── Sentence queue API ──────────────────────────────────────────────────────
+
+  /**
+   * Add one sentence to the TTS queue. Starts processing immediately if idle.
+   * Call this for each sentence as it arrives from the streaming API response.
+   */
+  enqueueSentence(text: string): void {
+    if (this.mode === 'dormant') return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    this.queueFinalized = false;
+    this.sentenceQueue.push(trimmed);
+    if (!this.isProcessingQueue) {
+      this.runSentenceQueue();
+    }
+  }
+
+  /**
+   * Signal that no more sentences are coming for this response.
+   * The queue will resume listening once it empties.
+   */
+  finalizeQueue(): void {
+    this.queueFinalized = true;
+    if (!this.isProcessingQueue && this.sentenceQueue.length === 0 && this.mode === 'speaking') {
+      this.resumeListening();
+    }
+  }
+
+  /**
+   * Drop all pending sentences but let the current one finish naturally.
+   * Use this for graceful artwork transitions.
+   */
+  clearQueueKeepCurrent(): void {
+    this.sentenceQueue = [];
+  }
+
+  /**
+   * Wait for the currently-playing sentence to end (or timeout).
+   */
+  waitForCurrentSentence(maxMs = 4000): Promise<void> {
+    return new Promise(resolve => {
+      if (!this.synthesis.speaking) { resolve(); return; }
+      const deadline = setTimeout(() => {
+        clearInterval(poll);
+        this.synthesis.cancel();
+        resolve();
+      }, maxMs);
+      const poll = setInterval(() => {
+        if (!this.synthesis.speaking) {
+          clearInterval(poll);
+          clearTimeout(deadline);
+          resolve();
+        }
+      }, 80);
+    });
+  }
+
+  private async runSentenceQueue(): Promise<void> {
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+    this.setMode('speaking');
+
+    while (this.sentenceQueue.length > 0) {
+      if (this.mode === 'dormant' || this.mode === 'thinking') break;
+      const sentence = this.sentenceQueue.shift()!;
+      try {
+        await this.speak(sentence);
+      } catch {
+        this.sentenceQueue = [];
+        break;
+      }
+      // Short natural breath between sentences
+      if (this.sentenceQueue.length > 0 && this.mode === 'speaking') {
+        await new Promise(r => setTimeout(r, 80));
+      }
+    }
+
+    this.isProcessingQueue = false;
+    if (this.queueFinalized && this.mode === 'speaking') {
+      this.resumeListening();
+    }
+    // If not finalized, more sentences may still arrive — stay in speaking mode
+  }
+
+  // ── End sentence queue ───────────────────────────────────────────────────────
+
   stopTour(): void {
     this.stopListening();
     this.stopSpeaking();
+    this.sentenceQueue = [];
+    this.isProcessingQueue = false;
+    this.queueFinalized = false;
     this.clearSilenceTimer();
     this.setMode('dormant');
     this.currentArtwork = null;
