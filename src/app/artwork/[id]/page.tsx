@@ -1,33 +1,34 @@
-// src/app/artwork/[id]/page.tsx - WITH PERSISTENT CHAT
+// src/app/artwork/[id]/page.tsx - WITH PERSISTENT FLOATING CHAT
 'use client';
 
 import { notFound, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { SessionProvider } from '@/contexts/SessionProvider';
 import { PersistentChatInterface } from '@/components/chat/PersistentChatInterface';
 import { QRScannerModal } from '@/components/qr/QRScannerModal';
 import { FloatingScanButton } from '@/components/qr/FloatingScanButton';
 import { TransitionIndicator } from '@/components/chat/TransitionIndicator';
 import { useTransition } from '@/hooks/useTransition';
+import { useArtwork } from '@/contexts/ArtworkContext';
 
 interface ArtworkPageProps {
   params: { id: string };
   searchParams: { museum?: string };
 }
 
-function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
+export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) {
   const router = useRouter();
   const artworkId = params.id;
   const museumId = searchParams.museum || 'met';
-  
+
   const [artwork, setArtwork] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [nextArtworkInfo, setNextArtworkInfo] = useState<{ id: string; title: string } | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  
+
   const transition = useTransition();
+  const { setCurrentArtwork } = useArtwork();
 
   useEffect(() => {
     loadArtwork(artworkId, museumId);
@@ -45,6 +46,13 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
     const unsubscribe = setupTransitionHandler();
     return unsubscribe;
   }, [museumId]);
+
+  // Publish current artwork to global context so FloatingChatWidget can pick it up
+  useEffect(() => {
+    if (artwork) {
+      setCurrentArtwork(artworkId, museumId, artwork.title, artwork.artist, artwork.year);
+    }
+  }, [artwork, artworkId, museumId, setCurrentArtwork]);
 
   const loadArtwork = async (id: string, museum: string) => {
     setLoading(true);
@@ -69,10 +77,7 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
       const response = await fetch(`/api/artworks/${nextId}?museum=${museum}`);
       if (response.ok) {
         const data = await response.json();
-        setNextArtworkInfo({
-          id: nextId,
-          title: data.artwork.title
-        });
+        setNextArtworkInfo({ id: nextId, title: data.artwork.title });
       }
     } catch (error) {
       console.error('Failed to load next artwork info:', error);
@@ -92,69 +97,49 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
     return () => {};
   };
 
-  // This is the updated handleQRDetected function for the artwork page
-  // Replace the existing handleQRDetected in src/app/artwork/[id]/page.tsx
-  
   const handleQRDetected = async (scannedArtworkId: string) => {
     try {
-      console.log('[ArtworkPage] QR Code detected - Artwork ID:', scannedArtworkId)
-      
-      // The QR code contains just the artwork ID (e.g., "liberty_leading_the_people")
-      const newArtworkId = scannedArtworkId.trim()
+      console.log('[ArtworkPage] QR Code detected - Artwork ID:', scannedArtworkId);
+      const newArtworkId = scannedArtworkId.trim();
 
       if (!newArtworkId) {
-        console.error('[ArtworkPage] Empty artwork ID from QR code')
-        alert('Invalid QR code - empty content')
-        return
+        alert('Invalid QR code - empty content');
+        return;
       }
 
-      setScannerOpen(false)
+      setScannerOpen(false);
 
-      // FIX #1: Compare against the CURRENT artwork ID from the page params
-      // (The page should have the current artworkId available from params)
-      const currentArtworkId = params.id // or however you access the current artwork ID
-      
-      if (newArtworkId === currentArtworkId) {
-        console.log('[ArtworkPage] Same artwork, ignoring')
-        return
+      if (newArtworkId === artworkId) {
+        console.log('[ArtworkPage] Same artwork, ignoring');
+        return;
       }
 
-      // FIX #2: Lookup which museum the new artwork belongs to
       try {
-        const lookupResponse = await fetch(`/api/artworks/lookup/${newArtworkId}`)
-        
+        const lookupResponse = await fetch(`/api/artworks/lookup/${newArtworkId}`);
         if (!lookupResponse.ok) {
-          console.error('[ArtworkPage] Artwork not found:', newArtworkId)
-          alert(`Artwork "${newArtworkId}" not found. Please try scanning again.`)
-          return
+          alert(`Artwork "${newArtworkId}" not found. Please try scanning again.`);
+          return;
         }
 
-        const artworkInfo = await lookupResponse.json()
-        const correctMuseum = artworkInfo.museum
-        
-        console.log('[ArtworkPage] Found artwork in museum:', correctMuseum)
+        const artworkInfo = await lookupResponse.json();
+        const correctMuseum = artworkInfo.museum;
 
-        // Verify the artwork exists in its museum
-        const verifyResponse = await fetch(`/api/artworks/${newArtworkId}?museum=${correctMuseum}`)
+        const verifyResponse = await fetch(`/api/artworks/${newArtworkId}?museum=${correctMuseum}`);
         if (!verifyResponse.ok) {
-          console.error('[ArtworkPage] Artwork verification failed')
-          alert('Error loading artwork. Please try again.')
-          return
+          alert('Error loading artwork. Please try again.');
+          return;
         }
-
       } catch (error) {
-        console.error('[ArtworkPage] Error looking up artwork:', error)
-        alert('Error loading artwork. Please try again.')
-        return
+        console.error('[ArtworkPage] Error looking up artwork:', error);
+        alert('Error loading artwork. Please try again.');
+        return;
       }
 
-      // Queue the transition to the new artwork
-      console.log('[ArtworkPage] Queueing transition to:', newArtworkId)
-      transition.enqueue(newArtworkId)
-      
+      console.log('[ArtworkPage] Queueing transition to:', newArtworkId);
+      transition.enqueue(newArtworkId);
     } catch (error) {
-      console.error('[ArtworkPage] Error handling QR code:', error)
-      alert('Error processing QR code. Please try again.')
+      console.error('[ArtworkPage] Error handling QR code:', error);
+      alert('Error processing QR code. Please try again.');
     }
   };
 
@@ -175,11 +160,11 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* ==================== HEADER - RESPONSIVE ==================== */}
+      {/* ==================== HEADER ==================== */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            {/* Breadcrumbs - Hidden on mobile, visible on tablet+ */}
+            {/* Breadcrumbs - hidden on mobile */}
             <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
               <a href="/" className="hover:text-blue-600">Home</a>
               <span>→</span>
@@ -190,23 +175,21 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
               </span>
             </div>
 
-            {/* Mobile: Just title */}
+            {/* Mobile: title */}
             <div className="md:hidden flex-1 min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 truncate">
-                {artwork.title}
-              </h1>
+              <h1 className="text-sm font-semibold text-gray-900 truncate">{artwork.title}</h1>
               <p className="text-xs text-gray-600 truncate">{artwork.artist}</p>
             </div>
 
-            {/* Scan Button - Desktop only */}
+            {/* Scan button — top-right, all screen sizes */}
             <button
               onClick={() => setScannerOpen(true)}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
-              Scan Next
+              <span className="hidden sm:inline">Scan Next</span>
             </button>
           </div>
         </div>
@@ -227,24 +210,18 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
         </div>
       )}
 
-      {/* ==================== MAIN CONTENT - RESPONSIVE LAYOUTS ==================== */}
+      {/* ==================== MAIN CONTENT ==================== */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full max-w-7xl mx-auto">
-          
+
           {/* ========== MOBILE LAYOUT (< 768px) ========== */}
           <div className="md:hidden h-full flex flex-col">
             {/* Compact Artwork Header */}
             <div className="bg-white p-4 border-b">
               <div className="flex gap-4">
-                {/* Thumbnail */}
                 <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
                   {artwork.image_url ? (
-                    <Image
-                      src={artwork.image_url}
-                      alt={artwork.title}
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={artwork.image_url} alt={artwork.title} fill className="object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,16 +230,10 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                     </div>
                   )}
                 </div>
-                
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <h2 className="text-base font-bold text-gray-900 mb-1">{artwork.title}</h2>
                   <p className="text-sm text-gray-700">{artwork.artist}</p>
-                  {artwork.year && (
-                    <p className="text-xs text-gray-500 mt-1">{artwork.year}</p>
-                  )}
-                  
-                  {/* Details Toggle */}
+                  {artwork.year && <p className="text-xs text-gray-500 mt-1">{artwork.year}</p>}
                   <button
                     onClick={() => setShowDetails(!showDetails)}
                     className="mt-2 text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -274,8 +245,6 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                   </button>
                 </div>
               </div>
-
-              {/* Expandable Details */}
               {showDetails && (
                 <div className="mt-4 pt-4 border-t border-gray-200 space-y-3 text-sm">
                   {artwork.medium && (
@@ -299,10 +268,9 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                 </div>
               )}
             </div>
-
-            {/* Chat - Takes remaining space */}
+            {/* Chat */}
             <div className="flex-1 min-h-0">
-              <PersistentChatInterface 
+              <PersistentChatInterface
                 artworkId={artworkId}
                 museumId={museumId}
                 artworkTitle={artwork.title}
@@ -315,16 +283,10 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
           {/* ========== TABLET LAYOUT (768px - 1024px) ========== */}
           <div className="hidden md:block lg:hidden h-full">
             <div className="h-full flex flex-col gap-4 p-4">
-              {/* Top: Image & Basic Info */}
               <div className="bg-white rounded-lg shadow-sm p-4 flex gap-4">
                 <div className="w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
                   {artwork.image_url ? (
-                    <Image
-                      src={artwork.image_url}
-                      alt={artwork.title}
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={artwork.image_url} alt={artwork.title} fill className="object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,11 +295,9 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                     </div>
                   )}
                 </div>
-                
                 <div className="flex-1">
                   <h1 className="text-2xl font-bold text-gray-900 mb-2">{artwork.title}</h1>
                   <p className="text-lg text-gray-700 mb-3">{artwork.artist}</p>
-                  
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     {artwork.year && (
                       <div>
@@ -352,7 +312,6 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                       </div>
                     )}
                   </div>
-
                   <button
                     onClick={() => setShowDetails(!showDetails)}
                     className="mt-3 text-sm text-blue-600 hover:text-blue-700"
@@ -361,8 +320,6 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                   </button>
                 </div>
               </div>
-
-              {/* Collapsible Details */}
               {showDetails && (
                 <div className="bg-white rounded-lg shadow-sm p-4 space-y-3 text-sm">
                   {artwork.description && (
@@ -379,10 +336,8 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                   )}
                 </div>
               )}
-
-              {/* Chat - Takes remaining height */}
               <div className="flex-1 min-h-0 bg-white rounded-lg shadow-sm overflow-hidden">
-                <PersistentChatInterface 
+                <PersistentChatInterface
                   artworkId={artworkId}
                   museumId={museumId}
                   artworkTitle={artwork.title}
@@ -393,10 +348,9 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
             </div>
           </div>
 
-          {/* ========== DESKTOP LAYOUT (> 1024px) ========== */}
-          <div className="hidden lg:grid lg:grid-cols-2 h-full gap-6 p-6">
-            {/* Left Column: Artwork Details */}
-            <div className="space-y-6 overflow-y-auto">
+          {/* ========== DESKTOP LAYOUT (> 1024px) — artwork only, chat is the floating widget ========== */}
+          <div className="hidden lg:block h-full overflow-y-auto p-6">
+            <div className="max-w-3xl mx-auto space-y-6">
               {/* Image */}
               <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                 <div className="aspect-[4/3] relative bg-gray-100">
@@ -476,32 +430,20 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
                 )}
               </div>
             </div>
-
-            {/* Right Column: Chat (Sticky) */}
-            <div className="sticky top-24 h-[calc(100vh-7rem)]">
-              <div className="h-full bg-white rounded-lg shadow-lg overflow-hidden">
-                <PersistentChatInterface 
-                  artworkId={artworkId}
-                  museumId={museumId}
-                  artworkTitle={artwork.title}
-                  artworkArtist={artwork.artist}
-                  artworkYear={artwork.year}
-                />
-              </div>
-            </div>
           </div>
+
         </div>
       </main>
 
-      {/* ==================== FLOATING SCAN BUTTON - Mobile/Tablet ==================== */}
+      {/* Mobile/Tablet floating scan button (desktop uses header button) */}
       <div className="lg:hidden">
-        <FloatingScanButton 
+        <FloatingScanButton
           onClick={() => setScannerOpen(true)}
           isScanning={scannerOpen}
         />
       </div>
 
-      {/* ==================== QR SCANNER MODAL ==================== */}
+      {/* QR Scanner Modal */}
       <QRScannerModal
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
@@ -509,14 +451,5 @@ function ArtworkPageContent({ params, searchParams }: ArtworkPageProps) {
         currentArtworkId={artworkId}
       />
     </div>
-  );
-}
-
-// Wrap the entire page in SessionProvider
-export default function ArtworkPage(props: ArtworkPageProps) {
-  return (
-    <SessionProvider>
-      <ArtworkPageContent {...props} />
-    </SessionProvider>
   );
 }

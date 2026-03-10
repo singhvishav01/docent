@@ -63,6 +63,8 @@ export function PersistentChatInterface({
   const voiceManager = useRef<WinstonVoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Ref to always call the latest handleVoiceInput (avoids stale closure in voice manager callback)
+  const handleVoiceInputRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,71 +106,88 @@ export function PersistentChatInterface({
   // Handle artwork transitions
   useEffect(() => {
     const handleArtworkTransition = async () => {
-      // Detect if artwork has changed
-      if (lastArtworkIdRef.current === artworkId) {
-        return; // Same artwork, no transition needed
-      }
+      if (lastArtworkIdRef.current === artworkId) return;
 
-      console.log(`[PersistentChat] 🎨 Artwork transition: ${lastArtworkIdRef.current} → ${artworkId}`);
-      
       const previousArtworkId = lastArtworkIdRef.current;
       lastArtworkIdRef.current = artworkId;
 
-      // If voice tour is active, handle the transition
-      if (session.isVoiceTourActive && voiceManager.current && currentArtwork) {
-        console.log('[PersistentChat] 🎤 Voice tour active during transition');
-        isTransitioningRef.current = true;
+      if (!artworkTitle) return; // Wait until new artwork info is loaded
 
-        try {
-          // 1. Stop current speech if speaking
-          if (voiceMode === 'speaking') {
-            console.log('[PersistentChat] 🛑 Stopping current speech...');
-            voiceManager.current.stopSpeaking();
-          }
+      console.log(`[PersistentChat] 🎨 Transition: ${previousArtworkId} → ${artworkId}`);
+      isTransitioningRef.current = true;
 
-          // 2. Wait a moment for any in-progress operations
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          // 3. Announce the new artwork
-          const announcementText = `Now viewing ${artworkTitle} by ${artworkArtist}${artworkYear ? `, created in ${artworkYear}` : ''}.`;
-          
-          console.log(`[PersistentChat] 📢 Announcing: "${announcementText}"`);
-          
-          // Add system message to chat
-          const transitionMessage: ChatMessage = {
-            id: `transition-${artworkId}-${Date.now()}`,
-            content: announcementText,
-            isUser: false,
-            role: 'assistant',
-            timestamp: new Date(),
-            artworkId: artworkId,
-            artworkInfo: {
-              id: artworkId,
-              title: artworkTitle || 'Artwork',
-              artist: artworkArtist || 'Unknown Artist',
-              year: artworkYear
-            }
-          };
-          
-          session.addMessage(transitionMessage);
-
-          // 4. Speak the announcement
-          await voiceManager.current.speak(announcementText);
-
-          // 5. Resume listening
-          console.log('[PersistentChat] 🎤 Resuming listening after transition...');
-          voiceManager.current.resumeListening();
-
-          // 6. Update voice manager's artwork context
-          voiceManager.current.onArtworkChange(artworkId, artworkTitle || 'Artwork');
-          
-        } catch (error) {
-          console.error('[PersistentChat] ❌ Transition error:', error);
-        } finally {
-          isTransitioningRef.current = false;
+      try {
+        // Stop any ongoing speech immediately
+        if (voiceManager.current && voiceMode === 'speaking') {
+          voiceManager.current.stopSpeaking();
         }
-      } else {
-        console.log('[PersistentChat] 💬 Text mode - no voice announcement');
+
+        // Collect last few messages for context (previous artwork's conversation)
+        const lastMessages = session.messages
+          .filter(m => m.artworkId === previousArtworkId)
+          .slice(-4)
+          .map(m => ({ role: m.role, content: m.content }));
+
+        // Grab the previous artwork title/artist from the last message's artworkInfo
+        // (currentArtwork still holds previous info at this point since state lags)
+        const prevTitle = currentArtwork?.title ?? undefined;
+        const prevArtist = currentArtwork?.artist ?? undefined;
+
+        // Ask AI to generate a natural transition sentence
+        let transitionText: string;
+        try {
+          const res = await fetch('/api/chat/transition', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              previousTitle: prevTitle,
+              previousArtist: prevArtist,
+              newTitle: artworkTitle,
+              newArtist: artworkArtist,
+              newYear: artworkYear,
+              lastMessages,
+            }),
+          });
+          const data = await res.json();
+          transitionText = data.transition;
+        } catch {
+          // Fallback if API call fails
+          transitionText = `Moving on to "${artworkTitle}"${artworkArtist ? ` by ${artworkArtist}` : ''}${artworkYear ? `, ${artworkYear}` : ''}.`;
+        }
+
+        console.log(`[PersistentChat] 📢 Transition text: "${transitionText}"`);
+
+        // Add to chat for all modes
+        const transitionMessage: ChatMessage = {
+          id: `transition-${artworkId}-${Date.now()}`,
+          content: transitionText,
+          isUser: false,
+          role: 'assistant',
+          timestamp: new Date(),
+          artworkId: artworkId,
+          artworkInfo: {
+            id: artworkId,
+            title: artworkTitle,
+            artist: artworkArtist || 'Unknown Artist',
+            year: artworkYear,
+          },
+        };
+        session.addMessage(transitionMessage);
+
+        // Speak it if voice tour is active
+        if (session.isVoiceTourActive && voiceManager.current) {
+          try {
+            await voiceManager.current.speak(transitionText);
+            voiceManager.current.resumeListening();
+          } catch (speechErr) {
+            console.error('[PersistentChat] ❌ Transition speech error:', speechErr);
+            voiceManager.current.resumeListening();
+          }
+        }
+      } catch (error) {
+        console.error('[PersistentChat] ❌ Transition error:', error);
+      } finally {
+        isTransitioningRef.current = false;
       }
     };
 
@@ -190,7 +209,8 @@ export function PersistentChatInterface({
       voiceManager.current.onTranscriptReceived((text, isFinal) => {
         if (isFinal) {
           setInterimTranscript('');
-          handleVoiceInput(text);
+          // Use ref so we always call the latest version (avoids stale closure)
+          handleVoiceInputRef.current(text);
         } else {
           setInterimTranscript(text);
         }
@@ -267,6 +287,10 @@ export function PersistentChatInterface({
     // Get AI response
     await sendMessageToAI(transcript, true);
   };
+
+  // Keep the ref pointing to the latest handleVoiceInput so the voice manager
+  // callback never captures a stale closure (e.g. old isVoiceTourActive value)
+  handleVoiceInputRef.current = handleVoiceInput;
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -348,18 +372,14 @@ export function PersistentChatInterface({
       if (isVoiceInput && voiceManager.current && session.isVoiceTourActive) {
         console.log('[PersistentChat] 🎤 Voice mode - speaking response');
         setIsLoading(false);
-        
+
         try {
-          const result = await voiceManager.current.speakWithInterruption(aiMessage.content);
-          
-          if (result === 'completed') {
-            console.log('[PersistentChat] ✅ Speaking completed');
-            voiceManager.current.resumeListening();
-          } else {
-            console.log('[PersistentChat] 🛑 Speaking interrupted');
-          }
+          await voiceManager.current.speakWithInterruption(aiMessage.content);
+          console.log('[PersistentChat] ✅ Speaking completed');
         } catch (speechError) {
           console.error('[PersistentChat] ❌ Speech error:', speechError);
+        } finally {
+          // Always resume listening — whether speech completed, was interrupted, or errored
           voiceManager.current.resumeListening();
         }
       } else {

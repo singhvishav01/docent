@@ -22,8 +22,8 @@ export function FloatingScanButton({ onClick, isScanning = false }: FloatingScan
     <button
       onClick={handleClick}
       className={`
-        fixed bottom-6 right-6 z-50
-        w-16 h-16 
+        fixed top-20 right-4 z-50
+        w-12 h-12
         bg-gradient-to-br from-blue-600 to-blue-700
         hover:from-blue-700 hover:to-blue-800
         text-white rounded-full shadow-2xl
@@ -35,8 +35,8 @@ export function FloatingScanButton({ onClick, isScanning = false }: FloatingScan
       title="Scan another artwork"
       aria-label="Scan QR code"
     >
-      <Camera 
-        className={`w-8 h-8 ${isScanning ? 'animate-pulse' : ''}`} 
+      <Camera
+        className={`w-5 h-5 ${isScanning ? 'animate-pulse' : ''}`}
       />
       
       {/* Ripple effect when active */}

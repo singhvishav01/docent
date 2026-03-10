@@ -64,99 +64,53 @@ function speakWithVerification(
   text: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    let hasActuallyStarted = false;
-    let isActuallySpeaking = false;
-    let checkInterval: NodeJS.Timeout;
+    let hasStarted = false;
+    let keepAliveInterval: NodeJS.Timeout;
     let safetyTimeout: NodeJS.Timeout;
-    
-    // Setup events
+
     utterance.onstart = () => {
-      console.log('[Voice] ▶️ onstart event fired');
-      hasActuallyStarted = true;
-      
-      // CRITICAL: Verify speech is ACTUALLY happening
-      // Check if synthesis.speaking is true after a small delay
-      setTimeout(() => {
+      console.log('[Voice] ▶️ Speech started');
+      hasStarted = true;
+      // Keep-alive ping every 10s to prevent Chrome's 15-second TTS cutoff bug
+      keepAliveInterval = setInterval(() => {
         if (synthesis.speaking) {
-          console.log('[Voice] ✅ VERIFIED: Speech is actually playing');
-          isActuallySpeaking = true;
-        } else {
-          console.error('[Voice] ❌ FAKE START: onstart fired but not actually speaking!');
-          console.log('[Voice] 🔄 Retrying speech...');
-          
-          // Try again with a different approach
-          setTimeout(() => {
-            synthesis.cancel();
-            synthesis.speak(utterance);
-          }, 100);
+          synthesis.pause();
+          synthesis.resume();
         }
-      }, 200); // Check after 200ms
+      }, 10000);
     };
-    
+
     utterance.onend = () => {
-      console.log('[Voice] ✅ onend event fired');
-      clearInterval(checkInterval);
+      console.log('[Voice] ✅ Speech completed');
+      clearInterval(keepAliveInterval);
       clearTimeout(safetyTimeout);
-      
-      // Only resolve if speech actually happened
-      if (isActuallySpeaking) {
-        console.log('[Voice] ✅ Speech completed successfully');
-        resolve();
-      } else {
-        console.error('[Voice] ❌ Speech ended but never actually played');
-        reject(new Error('Speech failed to play'));
-      }
+      resolve();
     };
-    
+
     utterance.onerror = (event: any) => {
-      console.error('[Voice] ❌ Speech error:', event.error);
-      clearInterval(checkInterval);
+      clearInterval(keepAliveInterval);
       clearTimeout(safetyTimeout);
-      reject(new Error(event.error));
-    };
-    
-    // Poll to verify speech is happening
-    checkInterval = setInterval(() => {
-      const isSpeaking = synthesis.speaking;
-      console.log(`[Voice] 🔍 Poll: speaking=${isSpeaking}, pending=${synthesis.pending}`);
-      
-      if (isSpeaking && !isActuallySpeaking) {
-        console.log('[Voice] ✅ CONFIRMED: Speech is actually playing!');
-        isActuallySpeaking = true;
-      }
-    }, 500);
-    
-    // Safety timeout
-    safetyTimeout = setTimeout(() => {
-      console.error('[Voice] ⚠️ Speech timeout after 30 seconds');
-      clearInterval(checkInterval);
-      
-      if (!hasActuallyStarted) {
-        console.error('[Voice] 💀 CRITICAL: Speech never started at all');
-        synthesis.cancel();
-        reject(new Error('Speech never started'));
-      } else if (!isActuallySpeaking) {
-        console.error('[Voice] 💀 CRITICAL: onstart fired but speech never played');
-        synthesis.cancel();
-        reject(new Error('Speech failed to play'));
-      } else {
-        console.log('[Voice] ⏰ Timeout but speech was playing, resolving');
+      // 'canceled' and 'interrupted' are not real errors — the caller handles them
+      if (event.error === 'canceled' || event.error === 'interrupted') {
+        console.log(`[Voice] Speech ${event.error} (not an error)`);
         resolve();
+      } else {
+        console.error('[Voice] ❌ Speech error:', event.error);
+        reject(new Error(event.error));
       }
-    }, 30000);
-    
-    // Queue the speech
+    };
+
+    // Safety timeout — estimate ~80ms per character, minimum 5s, max 60s
+    const estimatedMs = Math.min(60000, Math.max(5000, text.length * 80));
+    safetyTimeout = setTimeout(() => {
+      console.warn('[Voice] ⚠️ Speech safety timeout, resolving');
+      clearInterval(keepAliveInterval);
+      if (!hasStarted) synthesis.cancel();
+      resolve();
+    }, estimatedMs + 5000);
+
     console.log(`[Voice] 📢 Queuing speech (${text.length} chars)...`);
     synthesis.speak(utterance);
-    
-    // Log immediately to check state
-    setTimeout(() => {
-      console.log('[Voice] 🔍 Immediate check:', {
-        speaking: synthesis.speaking,
-        pending: synthesis.pending,
-        paused: synthesis.paused
-      });
-    }, 10);
   });
 }
 
@@ -1129,6 +1083,8 @@ export class WinstonVoiceManager {
         console.log('[Voice] Restarting...');
         setTimeout(() => this.startListening(), 100);
       }
+      // Note: 'speaking' mode restart is handled inside speakWithInterruption
+      // via its own overridden onend, so we don't restart here.
     };
 
     this.isInitialized = true;
@@ -1229,6 +1185,12 @@ export class WinstonVoiceManager {
       return;
     }
 
+    // Never restart if the tour has been stopped
+    if (this.mode === 'dormant') {
+      console.log('[Voice] Tour dormant, not starting recognition');
+      return;
+    }
+
     if (this.mode === 'listening') {
       console.log('[Voice] Already listening');
       return;
@@ -1325,67 +1287,96 @@ export class WinstonVoiceManager {
 }
   async speakWithInterruption(text: string): Promise<'completed' | 'interrupted'> {
     console.log(`[Voice] 🔊🎧 With interruption: "${text.substring(0, 50)}..."`);
-    
+
     return new Promise(async (resolve) => {
       let wasInterrupted = false;
       let speechComplete = false;
 
-      try {
-        if (this.mode !== 'listening') {
-          console.log('[Voice] Starting recognition');
-          this.recognition.start();
-        }
-      } catch (error: any) {
-        if (!error.message?.includes('already started')) {
-          console.error('[Voice] Recognition failed:', error);
-        }
-      }
-
       const originalOnResult = this.recognition.onresult;
-      
-      this.recognition.onresult = (event: any) => {
-        if (speechComplete || wasInterrupted) {
-          return;
-        }
+      const originalOnEnd = this.recognition.onend;
+
+      // Barge-in handler — applied fresh after every Chrome-forced restart
+      const bargeinOnResult = (event: any) => {
+        if (speechComplete || wasInterrupted) return;
 
         const last = event.results.length - 1;
         const result = event.results[last];
         const transcript = result[0].transcript;
         const isFinal = result.isFinal;
-        
+
         if (isFinal && transcript.trim().length > 3 && this.mode === 'speaking') {
           console.log(`[Voice] 🚨 INTERRUPTION: "${transcript}"`);
           wasInterrupted = true;
-          
+
           this.synthesis.cancel();
-          console.log('[Voice] 🛑 Canceled');
-          
           this.setMode('thinking');
-          
+
           if (this.onTranscript) {
-            console.log('[Voice] 📣 Sending interruption');
             this.onTranscript(transcript, true);
           }
-          
+
           this.recognition.onresult = originalOnResult;
+          this.recognition.onend = originalOnEnd;
           resolve('interrupted');
         }
       };
 
+      // Override onend so Chrome's forced restart during TTS re-applies barge-in handler
+      this.recognition.onend = () => {
+        if (speechComplete || wasInterrupted) {
+          // Speech done — hand back to the regular onend
+          this.recognition.onend = originalOnEnd;
+          originalOnEnd?.call(this.recognition);
+          return;
+        }
+
+        if (this.mode === 'speaking') {
+          // Chrome aborted recognition mid-speech — restart with barge-in handler intact
+          setTimeout(() => {
+            if (this.mode === 'speaking' && !speechComplete && !wasInterrupted) {
+              console.log('[Voice] Restarting recognition during speech for barge-in...');
+              this.recognition.onresult = bargeinOnResult;
+              try {
+                this.recognition.start();
+              } catch (e: any) {
+                if (!e.message?.includes('already started')) {
+                  console.warn('[Voice] Barge-in restart failed:', e);
+                }
+              }
+            }
+          }, 150);
+        } else {
+          this.recognition.onend = originalOnEnd;
+          originalOnEnd?.call(this.recognition);
+        }
+      };
+
+      // Start recognition and set barge-in handler
+      this.recognition.onresult = bargeinOnResult;
+      try {
+        if (this.mode !== 'listening') {
+          this.recognition.start();
+        }
+      } catch (error: any) {
+        if (!error.message?.includes('already started')) {
+          console.error('[Voice] Recognition start failed:', error);
+        }
+      }
+
       try {
         await this.speak(text);
-        
         speechComplete = true;
-        
+        this.recognition.onresult = originalOnResult;
+        this.recognition.onend = originalOnEnd;
         if (!wasInterrupted) {
           console.log('[Voice] ✅ Completed');
-          this.recognition.onresult = originalOnResult;
           resolve('completed');
         }
       } catch (error) {
-        console.error('[Voice] Error:', error);
+        console.error('[Voice] Error during speak:', error);
         this.recognition.onresult = originalOnResult;
-        resolve('interrupted');
+        this.recognition.onend = originalOnEnd;
+        resolve('completed');
       }
     });
   }
@@ -1437,13 +1428,19 @@ export class WinstonVoiceManager {
   }
 
   resumeListening(): void {
+    // Don't resume if the tour has been explicitly stopped
+    if (this.mode === 'dormant') {
+      console.log('[Voice] Tour dormant, not resuming');
+      return;
+    }
+
     console.log('[Voice] Resuming...');
-    
+
     if (this.mode === 'listening') {
       console.log('[Voice] Already listening');
       return;
     }
-    
+
     setTimeout(() => {
       this.startListening();
     }, 300);
@@ -1453,7 +1450,7 @@ export class WinstonVoiceManager {
     if (this.mode !== 'listening') return;
 
     console.log('[Voice] Silence...');
-    
+
     const offers = [
       "Feel free to ask me anything when you're ready.",
       "Take your time. I'm here if you have any questions.",
@@ -1462,9 +1459,13 @@ export class WinstonVoiceManager {
     ];
 
     const randomOffer = offers[Math.floor(Math.random() * offers.length)];
-    
+
     this.speak(randomOffer).then(() => {
-      this.resumeListening();
+      // Only resume if the tour is still active — prevents the greeting loop
+      // after stopTour() has been called while speak() was in flight
+      if (this.mode !== 'dormant') {
+        this.resumeListening();
+      }
     });
   }
 
