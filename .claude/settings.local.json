@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\src\\\\app\\\\api\\\\artworks:*)"
+    ]
+  }
+}
