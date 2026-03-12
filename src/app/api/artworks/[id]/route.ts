@@ -1,6 +1,7 @@
 // src/app/api/artworks/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { resolveImageUrl } from '@/lib/image-url';
 
 export async function GET(
   request: NextRequest,
@@ -73,7 +74,7 @@ export async function GET(
       medium: artwork.medium,
       dimensions: artwork.dimensions,
       description: artwork.description,
-      image_url: artwork.imageUrl,
+      image_url: resolveImageUrl(artwork.imageUrl),
       gallery: artwork.gallery,
       accession_number: artwork.accessionNumber,
       period: artwork.period,

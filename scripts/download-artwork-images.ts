@@ -6,7 +6,7 @@
  *  2. Art Institute of Chicago API (api.artic.edu)               — no auth, IIIF images
  *  3. Cleveland Museum of Art API  (openaccess-api.clevelandart.org)
  *
- * Saves to public/images/artworks/{id}.jpg and updates the database.
+ * Saves to ../docent-assets/images/artworks/{id}.jpg and updates the database.
  *
  * Run: npx tsx scripts/download-artwork-images.ts
  */
@@ -18,7 +18,7 @@ import * as https from 'https'
 import * as http from 'http'
 
 const prisma = new PrismaClient()
-const OUT_DIR = path.join(process.cwd(), 'public', 'images', 'artworks')
+const OUT_DIR = path.resolve(process.cwd(), '..', 'docent-assets', 'images', 'artworks')
 fs.mkdirSync(OUT_DIR, { recursive: true })
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────

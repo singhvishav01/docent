@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\src\\\\app\\\\api\\\\artworks:*)"
+      "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\src\\\\app\\\\api\\\\artworks:*)",
+      "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

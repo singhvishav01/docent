@@ -25,9 +25,15 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'collections.louvre.fr',  // ← ADDED for Louvre
+        hostname: 'collections.louvre.fr',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3001',
+        pathname: '/images/**',
       }
     ]
   },

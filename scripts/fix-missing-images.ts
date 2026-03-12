@@ -12,7 +12,7 @@ import * as https from 'https'
 import * as http from 'http'
 
 const prisma = new PrismaClient()
-const OUT_DIR = path.join(process.cwd(), 'public', 'images', 'artworks')
+const OUT_DIR = path.resolve(process.cwd(), '..', 'docent-assets', 'images', 'artworks')
 
 // Real Met Museum object IDs for the missing ones (verified public domain)
 const DIRECT_MET_IDS: Record<string, number> = {

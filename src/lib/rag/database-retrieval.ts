@@ -1,6 +1,7 @@
 // src/lib/rag/database-retrieval.ts
 import { PrismaClient } from '@prisma/client';
 import { ArtworkData, Museum, CuratorNote } from './types';
+import { resolveImageUrl } from '@/lib/image-url';
 
 // FIXED: Don't create client at module level
 let prismaInstance: PrismaClient | null = null;
@@ -237,7 +238,7 @@ export class DatabaseRetrieval {
       dimensions: artwork.dimensions || undefined,
       location: artwork.gallery || undefined,
       provenance: artwork.provenance || undefined,
-      image_url: artwork.imageUrl || undefined,
+      image_url: resolveImageUrl(artwork.imageUrl),
       gallery: artwork.gallery || undefined,
       accession_number: artwork.accessionNumber || undefined,
       period: artwork.period || undefined,

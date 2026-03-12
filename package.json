@@ -22,7 +22,9 @@
     "import-csv": "tsx scripts/import-csv-to-db.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "seed-dev": "SEED=1 npm run dev"
+    "seed-dev": "SEED=1 npm run dev",
+    "move-images": "tsx scripts/move-images.ts",
+    "serve:images": "cd ../docent-assets && node serve.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
