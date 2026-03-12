@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WINSTON — Museum Docent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600;700&family=Raleway:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --parchment: #F2E8D5;
+    --aged-gold: #C9A84C;
+    --deep-burgundy: #5C1A1A;
+    --charcoal: #1C1C1E;
+    --dark-bronze: #3D2B1F;
+    --warm-black: #0D0A07;
+    --dusty-rose: #A67B6B;
+    --forest-ink: #1E2D2F;
+    --cream: #FAF5EC;
+    --muted-gold: #8B7240;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--warm-black);
+    font-family: 'Raleway', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    width: 8px; height: 8px;
+    background: var(--aged-gold);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s ease;
+  }
+  .cursor-ring {
+    width: 32px; height: 32px;
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: all 0.15s ease;
+  }
+
+  /* HERO SECTION */
+  .hero {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Slideshow */
+  .slideshow {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+    background-size: cover;
+    background-position: center;
+  }
+  .slide.active { opacity: 1; }
+
+  /* Gradient overlays per slide */
+  .slide::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(13,10,7,0.85) 0%,
+      rgba(92,26,26,0.3) 50%,
+      rgba(13,10,7,0.75) 100%
+    );
+  }
+
+  .slide-1 { background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg'); background-color: #2a1a0a; }
+  .slide-2 { background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg'); background-color: #0a0a2a; }
+  .slide-3 { background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/320px-Camponotus_flavomarginatus_ant.jpg'); background-color: #1a0a0a; background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Raphael_School_of_Athens.jpg/1280px-Raphael_School_of_Athens.jpg'); }
+  .slide-4 { background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg/1280px-Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg'); background-color: #1a1a0a; }
+  .slide-5 { background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Vermeer_-_Girl_with_a_Pearl_Earring.jpg/767px-Vermeer_-_Girl_with_a_Pearl_Earring.jpg'); background-color: #0a1a1a; }
+
+  /* Grain overlay */
+  .grain {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  /* Scrolling artist names strip */
+  .artist-strip {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    overflow: hidden;
+    padding: 14px 0;
+    border-top: 1px solid rgba(201,168,76,0.2);
+    background: linear-gradient(90deg, rgba(13,10,7,0.95), rgba(61,43,31,0.7), rgba(13,10,7,0.95));
+  }
+
+  .artist-track {
+    display: flex;
+    gap: 0;
+    animation: scrollLeft 30s linear infinite;
+    white-space: nowrap;
+  }
+
+  .artist-track span {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--aged-gold);
+    opacity: 0.7;
+    padding: 0 40px;
+  }
+
+  .artist-track span.dot {
+    color: var(--dusty-rose);
+    opacity: 0.4;
+    padding: 0 10px;
+    font-size: 8px;
+  }
+
+  @keyframes scrollLeft {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Main hero content */
+  .hero-content {
+    position: relative;
+    z-index: 4;
+    text-align: center;
+    padding: 0 20px;
+    animation: fadeUp 1.5s ease 0.3s both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .winston-eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.5em;
+    color: var(--aged-gold);
+    margin-bottom: 24px;
+    opacity: 0.8;
+  }
+
+  .hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(72px, 12vw, 140px);
+    font-weight: 300;
+    color: var(--parchment);
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .hero-title .italic {
+    font-style: italic;
+    color: var(--aged-gold);
+  }
+
+  .hero-subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(16px, 2.5vw, 22px);
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(242,232,213,0.6);
+    margin: 20px 0 48px;
+    letter-spacing: 0.05em;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--warm-black);
+    background: var(--aged-gold);
+    border: none;
+    padding: 16px 40px;
+    cursor: none;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--parchment);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .btn-primary:hover::before { transform: translateX(0); }
+  .btn-primary span { position: relative; z-index: 1; }
+
+  .btn-secondary {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: rgba(242,232,213,0.6);
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 16px 40px;
+    cursor: none;
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--aged-gold);
+    color: var(--aged-gold);
+  }
+
+  /* Slide indicators */
+  .slide-indicators {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .indicator {
+    width: 1px;
+    height: 32px;
+    background: rgba(201,168,76,0.2);
+    cursor: none;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .indicator.active {
+    background: var(--aged-gold);
+    height: 48px;
+  }
+
+  .indicator::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: rgba(201,168,76,0);
+    white-space: nowrap;
+    transition: color 0.3s ease;
+  }
+
+  .indicator.active::after,
+  .indicator:hover::after {
+    color: rgba(201,168,76,0.6);
+  }
+
+  /* Artwork name floating */
+  .current-artwork {
+    position: absolute;
+    bottom: 80px;
+    left: 48px;
+    z-index: 5;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .artwork-label {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--aged-gold);
+    opacity: 0.6;
+    margin-bottom: 6px;
+  }
+
+  .artwork-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--parchment);
+    opacity: 0.85;
+  }
+
+  .artwork-artist {
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(242,232,213,0.4);
+    margin-top: 4px;
+  }
+
+  /* COLOUR PALETTE SECTION */
+  .palette-section {
+    background: var(--cream);
+    padding: 80px 48px;
+  }
+
+  .section-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.5em;
+    color: var(--muted-gold);
+    margin-bottom: 40px;
+  }
+
+  .palette-grid {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .swatch {
+    flex: 1;
+    min-width: 120px;
+    height: 180px;
+    position: relative;
+    overflow: hidden;
+    cursor: none;
+    transition: flex 0.4s ease;
+  }
+
+  .swatch:hover { flex: 2; }
+
+  .swatch-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 16px;
+  }
+
+  .swatch-name {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    margin-bottom: 4px;
+  }
+
+  .swatch-hex {
+    font-family: 'Raleway', sans-serif;
+    font-size: 10px;
+    opacity: 0.6;
+  }
+
+  /* Swatches colours */
+  .s1 { background: #0D0A07; }
+  .s1 .swatch-name, .s1 .swatch-hex { color: #F2E8D5; }
+
+  .s2 { background: #C9A84C; }
+  .s2 .swatch-name, .s2 .swatch-hex { color: #0D0A07; }
+
+  .s3 { background: #5C1A1A; }
+  .s3 .swatch-name, .s3 .swatch-hex { color: #F2E8D5; }
+
+  .s4 { background: #F2E8D5; border: 1px solid #e0d4bc; }
+  .s4 .swatch-name, .s4 .swatch-hex { color: #3D2B1F; }
+
+  .s5 { background: #3D2B1F; }
+  .s5 .swatch-name, .s5 .swatch-hex { color: #F2E8D5; }
+
+  .s6 { background: #1E2D2F; }
+  .s6 .swatch-name, .s6 .swatch-hex { color: #F2E8D5; }
+
+  .s7 { background: #A67B6B; }
+  .s7 .swatch-name, .s7 .swatch-hex { color: #0D0A07; }
+
+  /* Divider */
+  .gold-divider {
+    width: 80px;
+    height: 1px;
+    background: var(--aged-gold);
+    margin: 0 auto 16px;
+    opacity: 0.5;
+  }
+
+  /* Nav */
+  .nav {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 32px 48px;
+  }
+
+  .nav-logo {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    letter-spacing: 0.4em;
+    color: var(--parchment);
+  }
+
+  .nav-logo span {
+    color: var(--aged-gold);
+    font-size: 10px;
+    display: block;
+    letter-spacing: 0.6em;
+    margin-top: 2px;
+    opacity: 0.7;
+  }
+
+  .nav-right {
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(242,232,213,0.4);
+  }
+
+  /* Typography showcase */
+  .type-section {
+    background: var(--warm-black);
+    padding: 80px 48px;
+    border-top: 1px solid rgba(201,168,76,0.1);
+  }
+
+  .type-showcase {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    max-width: 900px;
+  }
+
+  .type-item label {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--aged-gold);
+    opacity: 0.5;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .type-display {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 48px;
+    font-weight: 300;
+    color: var(--parchment);
+    line-height: 1;
+    font-style: italic;
+  }
+
+  .type-body {
+    font-family: 'Raleway', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(242,232,213,0.5);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  .type-cinzel {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.4em;
+    color: var(--aged-gold);
+  }
+
+  .type-accent {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    color: var(--dusty-rose);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <nav class="nav">
+    <div class="nav-logo">
+      WINSTON
+      <span>MUSEUM DOCENT</span>
+    </div>
+    <div class="nav-right">EST. 2025</div>
+  </nav>
+
+  <div class="slideshow">
+    <div class="slide slide-1 active"></div>
+    <div class="slide slide-2"></div>
+    <div class="slide slide-3"></div>
+    <div class="slide slide-4"></div>
+    <div class="slide slide-5"></div>
+  </div>
+
+  <div class="grain"></div>
+
+  <div class="hero-content">
+    <p class="winston-eyebrow">YOUR PERSONAL MUSEUM GUIDE</p>
+    <h1 class="hero-title">
+      Art<br>
+      <span class="italic">Speaks.</span>
+    </h1>
+    <p class="hero-subtitle">WINSTON remembers what moves you.</p>
+    <div class="hero-cta">
+      <button class="btn-primary"><span>BEGIN YOUR JOURNEY</span></button>
+      <button class="btn-secondary">CONTINUE AS GUEST</button>
+    </div>
+  </div>
+
+  <div class="slide-indicators" id="indicators">
+    <div class="indicator active" data-label="MONA LISA" data-index="0"></div>
+    <div class="indicator" data-label="STARRY NIGHT" data-index="1"></div>
+    <div class="indicator" data-label="SCHOOL OF ATHENS" data-index="2"></div>
+    <div class="indicator" data-label="CREATION OF ADAM" data-index="3"></div>
+    <div class="indicator" data-label="GIRL WITH PEARL" data-index="4"></div>
+  </div>
+
+  <div class="current-artwork" id="artworkLabel">
+    <p class="artwork-label">NOW FEATURING</p>
+    <p class="artwork-name" id="artworkName">Mona Lisa</p>
+    <p class="artwork-artist" id="artworkArtist">Leonardo da Vinci · c. 1503</p>
+  </div>
+
+  <div class="artist-strip">
+    <div class="artist-track" id="track">
+      <span>DA VINCI</span><span class="dot">◆</span>
+      <span>VAN GOGH</span><span class="dot">◆</span>
+      <span>MICHELANGELO</span><span class="dot">◆</span>
+      <span>RAPHAEL</span><span class="dot">◆</span>
+      <span>VERMEER</span><span class="dot">◆</span>
+      <span>REMBRANDT</span><span class="dot">◆</span>
+      <span>CARAVAGGIO</span><span class="dot">◆</span>
+      <span>BOTTICELLI</span><span class="dot">◆</span>
+      <span>MONET</span><span class="dot">◆</span>
+      <span>PICASSO</span><span class="dot">◆</span>
+      <span>LOUVRE</span><span class="dot">◆</span>
+      <span>MET</span><span class="dot">◆</span>
+      <span>UFFIZI</span><span class="dot">◆</span>
+      <span>PRADO</span><span class="dot">◆</span>
+      <span>RIJKSMUSEUM</span><span class="dot">◆</span>
+      <span>HERMITAGE</span><span class="dot">◆</span>
+      <!-- duplicate for seamless loop -->
+      <span>DA VINCI</span><span class="dot">◆</span>
+      <span>VAN GOGH</span><span class="dot">◆</span>
+      <span>MICHELANGELO</span><span class="dot">◆</span>
+      <span>RAPHAEL</span><span class="dot">◆</span>
+      <span>VERMEER</span><span class="dot">◆</span>
+      <span>REMBRANDT</span><span class="dot">◆</span>
+      <span>CARAVAGGIO</span><span class="dot">◆</span>
+      <span>BOTTICELLI</span><span class="dot">◆</span>
+      <span>MONET</span><span class="dot">◆</span>
+      <span>PICASSO</span><span class="dot">◆</span>
+      <span>LOUVRE</span><span class="dot">◆</span>
+      <span>MET</span><span class="dot">◆</span>
+      <span>UFFIZI</span><span class="dot">◆</span>
+      <span>PRADO</span><span class="dot">◆</span>
+      <span>RIJKSMUSEUM</span><span class="dot">◆</span>
+      <span>HERMITAGE</span><span class="dot">◆</span>
+    </div>
+  </div>
+</section>
+
+<!-- COLOUR PALETTE -->
+<section class="palette-section">
+  <p class="section-label">◆ &nbsp; THE COLOUR PALETTE &nbsp; ◆</p>
+  <div class="palette-grid">
+    <div class="swatch s1">
+      <div class="swatch-inner">
+        <p class="swatch-name">WARM BLACK</p>
+        <p class="swatch-hex">#0D0A07</p>
+      </div>
+    </div>
+    <div class="swatch s2">
+      <div class="swatch-inner">
+        <p class="swatch-name">AGED GOLD</p>
+        <p class="swatch-hex">#C9A84C</p>
+      </div>
+    </div>
+    <div class="swatch s3">
+      <div class="swatch-inner">
+        <p class="swatch-name">DEEP BURGUNDY</p>
+        <p class="swatch-hex">#5C1A1A</p>
+      </div>
+    </div>
+    <div class="swatch s4">
+      <div class="swatch-inner">
+        <p class="swatch-name">PARCHMENT</p>
+        <p class="swatch-hex">#F2E8D5</p>
+      </div>
+    </div>
+    <div class="swatch s5">
+      <div class="swatch-inner">
+        <p class="swatch-name">DARK BRONZE</p>
+        <p class="swatch-hex">#3D2B1F</p>
+      </div>
+    </div>
+    <div class="swatch s6">
+      <div class="swatch-inner">
+        <p class="swatch-name">FOREST INK</p>
+        <p class="swatch-hex">#1E2D2F</p>
+      </div>
+    </div>
+    <div class="swatch s7">
+      <div class="swatch-inner">
+        <p class="swatch-name">DUSTY ROSE</p>
+        <p class="swatch-hex">#A67B6B</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TYPOGRAPHY -->
+<section class="type-section">
+  <p class="section-label" style="color: rgba(201,168,76,0.5)">◆ &nbsp; TYPOGRAPHY SYSTEM &nbsp; ◆</p>
+  <div class="type-showcase">
+    <div class="type-item">
+      <label>DISPLAY / HEADINGS</label>
+      <p class="type-display">Cormorant<br>Garamond</p>
+    </div>
+    <div class="type-item">
+      <label>LABELS / UI ELEMENTS</label>
+      <p class="type-cinzel">CINZEL SERIF</p>
+      <p style="margin-top:20px" class="type-cinzel" style="font-size:10px">MUSEUM · GUIDE · TOURS</p>
+    </div>
+    <div class="type-item">
+      <label>BODY / DESCRIPTIONS</label>
+      <p class="type-body">Art has the power to move us across centuries. WINSTON guides you through stories that paintings have waited to tell.</p>
+    </div>
+    <div class="type-item">
+      <label>ACCENT / QUOTES</label>
+      <p class="type-accent">"Every artwork has a story only silence can tell."</p>
+    </div>
+  </div>
+</section>
+
+<!-- WINSTON PREVIEW SECTION -->
+<section class="preview-section">
+  <div class="preview-inner">
+    <div class="preview-left">
+      <p class="section-label" style="color: rgba(201,168,76,0.5); margin-bottom: 16px">◆ &nbsp; EXPERIENCE WINSTON &nbsp; ◆</p>
+      <h2 class="preview-heading">This is what<br><span class="italic-gold">awaits you.</span></h2>
+      <p class="preview-subtext">Stand before a masterpiece. WINSTON speaks. Ask anything — history, technique, hidden meaning. Every visit remembered. Every question answered.</p>
+      <div class="feature-list">
+        <div class="feature-item">
+          <span class="feature-dot">◆</span>
+          <span>Knows what you're standing near</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot">◆</span>
+          <span>Remembers your past visits</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot">◆</span>
+          <span>Curates tours around your interests</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot">◆</span>
+          <span>Speaks — and listens</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-right">
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-artwork-bar">
+            <div class="phone-artwork-thumb"></div>
+            <div>
+              <p class="phone-artwork-title">The Starry Night</p>
+              <p class="phone-artwork-sub">Vincent van Gogh · 1889</p>
+            </div>
+          </div>
+          <div class="chat-window" id="chatWindow">
+            <!-- messages injected by JS -->
+          </div>
+          <div class="phone-input-bar">
+            <div class="mic-pulse" id="micPulse">
+              <div class="mic-icon">🎙</div>
+            </div>
+            <p class="phone-input-hint">Speak to WINSTON...</p>
+          </div>
+        </div>
+      </div>
+      <div class="phone-glow"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SIGNUP SECTION -->
+<section class="signup-section">
+  <div class="signup-inner">
+    <div class="gold-divider" style="margin-bottom: 32px; opacity: 0.4;"></div>
+    <p class="section-label" style="color: rgba(201,168,76,0.6); text-align:center; margin-bottom: 24px">◆ &nbsp; JOIN WINSTON &nbsp; ◆</p>
+    <h2 class="signup-heading">WINSTON remembers<br><span class="italic-gold">his visitors.</span></h2>
+    <p class="signup-sub">Registered visitors get a curated experience that learns what moves them, picks up where they left off, and gets richer with every visit.</p>
+    <div class="signup-buttons">
+      <button class="btn-primary signup-btn"><span>CREATE YOUR PROFILE</span></button>
+      <button class="btn-secondary signup-btn-ghost">Continue as Guest</button>
+    </div>
+    <p class="guest-warning">Guest sessions are not saved. Future visits won't remember your preferences or history.</p>
+    <div class="gold-divider" style="margin-top: 48px; opacity: 0.2;"></div>
+  </div>
+</section>
+
+<style>
+  /* PREVIEW SECTION */
+  .preview-section {
+    background: linear-gradient(180deg, var(--warm-black) 0%, #0f0c09 100%);
+    padding: 100px 48px;
+    border-top: 1px solid rgba(201,168,76,0.1);
+  }
+
+  .preview-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .preview-heading {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(40px, 5vw, 64px);
+    font-weight: 300;
+    color: var(--parchment);
+    line-height: 1.1;
+    margin-bottom: 24px;
+  }
+
+  .italic-gold {
+    font-style: italic;
+    color: var(--aged-gold);
+  }
+
+  .preview-subtext {
+    font-family: 'Raleway', sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(242,232,213,0.5);
+    line-height: 1.9;
+    letter-spacing: 0.04em;
+    margin-bottom: 40px;
+  }
+
+  .feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(242,232,213,0.7);
+    letter-spacing: 0.05em;
+  }
+
+  .feature-dot {
+    color: var(--aged-gold);
+    font-size: 8px;
+    flex-shrink: 0;
+  }
+
+  /* PHONE FRAME */
+  .preview-right {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+
+  .phone-glow {
+    position: absolute;
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .phone-frame {
+    width: 280px;
+    height: 560px;
+    background: #0a0806;
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 40px;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(201,168,76,0.1),
+      0 40px 80px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(201,168,76,0.1);
+  }
+
+  .phone-notch {
+    width: 80px;
+    height: 24px;
+    background: #0a0806;
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+
+  .phone-screen {
+    height: calc(100% - 24px);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .phone-artwork-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(201,168,76,0.1);
+    background: rgba(61,43,31,0.3);
+  }
+
+  .phone-artwork-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #1a3a2a, #0d1f2d);
+    border: 1px solid rgba(201,168,76,0.2);
+    background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/320px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg');
+    background-size: cover;
+    flex-shrink: 0;
+  }
+
+  .phone-artwork-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    color: var(--parchment);
+    font-style: italic;
+  }
+
+  .phone-artwork-sub {
+    font-family: 'Raleway', sans-serif;
+    font-size: 9px;
+    color: rgba(201,168,76,0.5);
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  .chat-window {
+    flex: 1;
+    overflow: hidden;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chat-msg {
+    max-width: 85%;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.5s ease;
+  }
+
+  .chat-msg.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .chat-msg.winston {
+    align-self: flex-start;
+  }
+
+  .chat-msg.user {
+    align-self: flex-end;
+  }
+
+  .msg-label {
+    font-family: 'Cinzel', serif;
+    font-size: 7px;
+    letter-spacing: 0.3em;
+    margin-bottom: 4px;
+  }
+
+  .winston .msg-label { color: rgba(201,168,76,0.5); }
+  .user .msg-label { color: rgba(166,123,107,0.5); text-align: right; }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 2px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .winston .msg-bubble {
+    background: rgba(61,43,31,0.4);
+    border: 1px solid rgba(201,168,76,0.15);
+    color: rgba(242,232,213,0.85);
+    border-radius: 0 12px 12px 12px;
+  }
+
+  .user .msg-bubble {
+    background: rgba(92,26,26,0.3);
+    border: 1px solid rgba(166,123,107,0.2);
+    color: rgba(242,232,213,0.7);
+    border-radius: 12px 0 12px 12px;
+  }
+
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(61,43,31,0.4);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 0 12px 12px 12px;
+    width: fit-content;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .typing-indicator.visible { opacity: 1; }
+
+  .typing-dot {
+    width: 4px; height: 4px;
+    background: rgba(201,168,76,0.5);
+    border-radius: 50%;
+    animation: typingBounce 1s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+
+  .phone-input-bar {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(201,168,76,0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(13,10,7,0.8);
+  }
+
+  .mic-pulse {
+    width: 32px; height: 32px;
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .mic-pulse.active::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 50%;
+    animation: micRipple 1.5s infinite;
+  }
+
+  @keyframes micRipple {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  .phone-input-hint {
+    font-family: 'Raleway', sans-serif;
+    font-size: 10px;
+    color: rgba(242,232,213,0.2);
+    letter-spacing: 0.1em;
+    font-style: italic;
+  }
+
+  /* SIGNUP SECTION */
+  .signup-section {
+    background: linear-gradient(180deg, #0f0c09 0%, #150f0a 100%);
+    padding: 100px 48px;
+    text-align: center;
+  }
+
+  .signup-inner {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .signup-heading {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(40px, 5vw, 64px);
+    font-weight: 300;
+    color: var(--parchment);
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+
+  .signup-sub {
+    font-family: 'Raleway', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(242,232,213,0.45);
+    line-height: 1.9;
+    letter-spacing: 0.04em;
+    margin-bottom: 40px;
+  }
+
+  .signup-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .signup-btn {
+    width: 280px;
+    padding: 18px 40px;
+  }
+
+  .signup-btn-ghost {
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(242,232,213,0.3);
+    background: transparent;
+    border: none;
+    cursor: none;
+    transition: color 0.3s ease;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-color: rgba(242,232,213,0.15);
+  }
+
+  .signup-btn-ghost:hover {
+    color: rgba(242,232,213,0.5);
+  }
+
+  .guest-warning {
+    font-family: 'Raleway', sans-serif;
+    font-size: 10px;
+    color: rgba(166,123,107,0.4);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    max-width: 360px;
+    margin: 0 auto;
+    font-style: italic;
+  }
+
+  @media (max-width: 768px) {
+    .preview-inner { grid-template-columns: 1fr; gap: 60px; }
+    .phone-frame { width: 240px; height: 480px; }
+  }
+</style>
+
+<script>
+  // Cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top = e.clientY + 'px';
+    setTimeout(() => {
+      ring.style.left = e.clientX + 'px';
+      ring.style.top = e.clientY + 'px';
+    }, 80);
+  });
+
+  // Slideshow
+  const artworks = [
+    { name: 'Mona Lisa', artist: 'Leonardo da Vinci · c. 1503' },
+    { name: 'The Starry Night', artist: 'Vincent van Gogh · 1889' },
+    { name: 'School of Athens', artist: 'Raphael · 1511' },
+    { name: 'Creation of Adam', artist: 'Michelangelo · 1512' },
+    { name: 'Girl with a Pearl Earring', artist: 'Johannes Vermeer · c. 1665' },
+  ];
+
+  const slides = document.querySelectorAll('.slide');
+  const indicators = document.querySelectorAll('.indicator');
+  const artworkName = document.getElementById('artworkName');
+  const artworkArtist = document.getElementById('artworkArtist');
+  let current = 0;
+
+  function goTo(index) {
+    slides[current].classList.remove('active');
+    indicators[current].classList.remove('active');
+    current = index;
+    slides[current].classList.add('active');
+    indicators[current].classList.add('active');
+    artworkName.style.opacity = 0;
+    artworkArtist.style.opacity = 0;
+    setTimeout(() => {
+      artworkName.textContent = artworks[current].name;
+      artworkArtist.textContent = artworks[current].artist;
+      artworkName.style.transition = 'opacity 0.8s ease';
+      artworkArtist.style.transition = 'opacity 0.8s ease';
+      artworkName.style.opacity = 1;
+      artworkArtist.style.opacity = 0.6;
+    }, 400);
+  }
+
+  indicators.forEach(ind => {
+    ind.addEventListener('click', () => goTo(parseInt(ind.dataset.index)));
+  });
+
+  setInterval(() => goTo((current + 1) % slides.length), 5000);
+
+  // WINSTON Chat Animation
+  const conversation = [
+    { role: 'winston', text: "You're standing before Van Gogh's Starry Night. Painted in 1889 — during his time at Saint-Paul-de-Mausole asylum. What you see isn't chaos. It's grief, made beautiful." },
+    { role: 'user', text: "Why does it feel so alive?" },
+    { role: 'winston', text: "The swirling strokes — Van Gogh called it 'the terrible passions of humanity.' He painted from memory, at night, looking out his window. The village below is imagined. The sky is everything he felt." },
+    { role: 'user', text: "What's that bright star on the right?" },
+    { role: 'winston', text: "Venus. Van Gogh was obsessed with the night sky. He once wrote to his brother Theo — 'I want to paint the starry sky.' This was his answer." },
+  ];
+
+  const chatWindow = document.getElementById('chatWindow');
+  const micPulse = document.getElementById('micPulse');
+  let msgIndex = 0;
+  let chatStarted = false;
+
+  function createTyping() {
+    const div = document.createElement('div');
+    div.className = 'chat-msg winston';
+    div.innerHTML = `<p class="msg-label">WINSTON</p><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+    chatWindow.appendChild(div);
+    setTimeout(() => div.querySelector('.typing-indicator').classList.add('visible'), 50);
+    return div;
+  }
+
+  function addMessage(msg, delay) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const isWinston = msg.role === 'winston';
+
+        if (isWinston) {
+          micPulse.classList.remove('active');
+          const typing = createTyping();
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+          setTimeout(() => {
+            typing.remove();
+            const div = document.createElement('div');
+            div.className = `chat-msg ${msg.role}`;
+            div.innerHTML = `<p class="msg-label">${msg.role === 'winston' ? 'WINSTON' : 'YOU'}</p><div class="msg-bubble">${msg.text}</div>`;
+            chatWindow.appendChild(div);
+            setTimeout(() => div.classList.add('visible'), 50);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            resolve();
+          }, 1800);
+        } else {
+          micPulse.classList.add('active');
+          setTimeout(() => {
+            const div = document.createElement('div');
+            div.className = `chat-msg ${msg.role}`;
+            div.innerHTML = `<p class="msg-label">${msg.role === 'winston' ? 'WINSTON' : 'YOU'}</p><div class="msg-bubble">${msg.text}</div>`;
+            chatWindow.appendChild(div);
+            setTimeout(() => div.classList.add('visible'), 50);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            resolve();
+          }, 600);
+        }
+      }, delay);
+    });
+  }
+
+  async function runConversation() {
+    for (let i = 0; i < conversation.length; i++) {
+      await addMessage(conversation[i], i === 0 ? 800 : 1200);
+      await new Promise(r => setTimeout(r, conversation[i].role === 'winston' ? 2200 : 1000));
+    }
+    // Loop after pause
+    setTimeout(() => {
+      chatWindow.innerHTML = '';
+      runConversation();
+    }, 4000);
+  }
+
+  // Start when scrolled into view
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting && !chatStarted) {
+        chatStarted = true;
+        runConversation();
+      }
+    });
+  }, { threshold: 0.3 });
+
+  observer.observe(document.getElementById('chatWindow'));
+</script>
+</body>
+</html>
