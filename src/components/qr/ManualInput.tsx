@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { Search } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
@@ -14,18 +12,13 @@ export function ManualInput() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!artworkId.trim()) {
       toast.error('Please enter an artwork ID')
       return
     }
-
     setIsLoading(true)
-
     try {
-      // Verify artwork exists before navigating
       const response = await fetch(`/api/artworks/${encodeURIComponent(artworkId.trim())}`)
-      
       if (response.ok) {
         router.push(`/artwork/${encodeURIComponent(artworkId.trim())}`)
         toast.success('Artwork found!')
@@ -43,41 +36,58 @@ export function ManualInput() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="text-center">
-        <h3 className="font-medium text-gray-900 mb-2">Manual Entry</h3>
-        <p className="text-sm text-gray-600">
-          Enter the artwork ID found on the museum placard
-        </p>
-      </div>
+    <div>
+      <form onSubmit={handleSubmit}>
+        <div style={{ position: 'relative', marginBottom: '12px' }}>
+          <input
+            type="text"
+            placeholder="Enter artwork ID (e.g., ART-001)"
+            value={artworkId}
+            onChange={e => setArtworkId(e.target.value)}
+            style={{
+              display: 'block', width: '100%', padding: '12px 14px',
+              background: 'rgba(242,232,213,0.04)',
+              border: '1px solid rgba(201,168,76,0.15)',
+              outline: 'none',
+              fontFamily: "'Raleway', sans-serif", fontSize: '13px', fontWeight: 300,
+              color: '#F2E8D5', letterSpacing: '0.04em', textAlign: 'center',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.2s ease',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.4)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.15)')}
+          />
+        </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          type="text"
-          placeholder="Enter artwork ID (e.g., ART-001)"
-          value={artworkId}
-          onChange={(e) => setArtworkId(e.target.value)}
-          className="text-center"
-        />
-        
-        <Button 
-          type="submit" 
-          className="w-full" 
+        <button
+          type="submit"
           disabled={isLoading}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            width: '100%', padding: '12px',
+            background: isLoading ? 'rgba(201,168,76,0.2)' : '#C9A84C',
+            border: 'none', cursor: isLoading ? 'default' : 'pointer',
+            fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em',
+            color: isLoading ? 'rgba(201,168,76,0.4)' : '#0D0A07',
+            transition: 'background 0.2s ease',
+          }}
+          onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = '#F2E8D5'; }}
+          onMouseLeave={e => { if (!isLoading) e.currentTarget.style.background = '#C9A84C'; }}
         >
           {isLoading ? (
-            <div className="flex items-center">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-              Looking up artwork...
-            </div>
+            <>
+              <div style={{ width: '14px', height: '14px', border: '1px solid rgba(201,168,76,0.3)', borderTopColor: '#C9A84C', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              SEARCHING...
+            </>
           ) : (
             <>
-              <Search className="w-4 h-4 mr-2" />
-              Find Artwork
+              <Search size={14} />
+              FIND ARTWORK
             </>
           )}
-        </Button>
+        </button>
       </form>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

@@ -8,11 +8,21 @@ interface ActiveArtwork {
   title: string;
   artist: string;
   year?: number;
+  // Full artwork data — populated by ArtworkPage so PersistentChatInterface
+  // doesn't need to fetch it separately (prevents N×3 duplicate API calls)
+  full?: Record<string, any>;
 }
 
 interface ArtworkContextValue {
   activeArtwork: ActiveArtwork | null;
-  setCurrentArtwork: (artworkId: string, museumId: string, title: string, artist: string, year?: number) => void;
+  setCurrentArtwork: (
+    artworkId: string,
+    museumId: string,
+    title: string,
+    artist: string,
+    year?: number,
+    full?: Record<string, any>
+  ) => void;
   clearCurrentArtwork: () => void;
 }
 
@@ -26,9 +36,10 @@ export function ArtworkProvider({ children }: { children: React.ReactNode }) {
     museumId: string,
     title: string,
     artist: string,
-    year?: number
+    year?: number,
+    full?: Record<string, any>
   ) => {
-    setActiveArtwork({ artworkId, museumId, title, artist, year });
+    setActiveArtwork({ artworkId, museumId, title, artist, year, full });
   }, []);
 
   const clearCurrentArtwork = useCallback(() => {

@@ -1003,6 +1003,9 @@ export class WinstonVoiceManager {
   private isProcessingQueue = false;
   private queueFinalized = false;
 
+  // Prevent the silence-offer from looping until the user actually speaks
+  private silenceOffered = false;
+
   constructor(config: VoiceConfig = {}) {
   this.silenceTimeout = config.silenceTimeout || 30000;
   
@@ -1047,7 +1050,12 @@ export class WinstonVoiceManager {
         this.handleInterruption(transcript, isFinal);
         return;
       }
-      
+
+      // User is speaking — reset the silence-offer gate so it can fire again later
+      if (transcript.trim().length > 0) {
+        this.silenceOffered = false;
+      }
+
       this.resetSilenceTimer();
       
       if (this.onTranscript) {
@@ -1095,16 +1103,17 @@ export class WinstonVoiceManager {
     this.isInitialized = true;
   }
 
-  async startTour(artworkId: string, artworkTitle: string): Promise<void> {
+  async startTour(artworkId: string, artworkTitle: string, visitorName?: string | null): Promise<void> {
     this.currentArtwork = { id: artworkId, title: artworkTitle };
-    
+    this.silenceOffered = false; // Reset for new tour session
+
     console.log('[Voice] 🎬 Starting tour...');
-    
+
     await this.warmUpTTS();
-    
+
     this.setMode('speaking');
 
-    const greeting = this.generateGreeting(artworkTitle);
+    const greeting = this.generateGreeting(artworkTitle, visitorName);
     
     try {
       await this.speak(greeting);
@@ -1546,6 +1555,9 @@ export class WinstonVoiceManager {
 
     console.log('[Voice] Silence...');
 
+    // Mark that we've already offered help — don't repeat until user speaks
+    this.silenceOffered = true;
+
     const offers = [
       "Feel free to ask me anything when you're ready.",
       "Take your time. I'm here if you have any questions.",
@@ -1566,7 +1578,10 @@ export class WinstonVoiceManager {
 
   private resetSilenceTimer(): void {
     this.clearSilenceTimer();
-    
+
+    // Don't reschedule if we've already offered help and the user hasn't spoken yet
+    if (this.silenceOffered) return;
+
     if (this.mode === 'listening') {
       this.silenceTimer = setTimeout(() => {
         this.handleSilence();
@@ -1581,14 +1596,18 @@ export class WinstonVoiceManager {
     }
   }
 
-  private generateGreeting(artworkTitle: string): string {
-    const greetings = [
-      `Welcome. I'm here to guide you. You're viewing "${artworkTitle}." What would you like to know?`,
-      `Hello. This is "${artworkTitle}." I'd be happy to tell you about it.`,
-      `Good to see you. You're looking at "${artworkTitle}." Feel free to ask me anything.`
-    ];
-    
-    return greetings[Math.floor(Math.random() * greetings.length)];
+  private generateGreeting(artworkTitle: string, visitorName?: string | null): string {
+    // Dynamic greeting — imported lazily to avoid circular deps at module load
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { generateVoiceGreeting } = require('@/lib/ai/greeting-generator');
+      return generateVoiceGreeting(visitorName ?? null, artworkTitle);
+    } catch {
+      // Fallback if module isn't available (e.g., during SSR)
+      return visitorName
+        ? `Welcome, ${visitorName}. You are looking at ${artworkTitle}. What would you like to know?`
+        : `Welcome. You are looking at ${artworkTitle}. What would you like to know?`;
+    }
   }
 
   private generateTransition(fromTitle: string | undefined, toTitle: string): string {

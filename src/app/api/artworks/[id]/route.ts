@@ -19,8 +19,6 @@ export async function GET(
       );
     }
 
-    console.log(`Loading artwork: ${artworkId} from museum: ${requestedMuseumId}`);
-
     // Load artwork from database with curator notes
     const artwork = await db.artwork.findFirst({
       where: {
@@ -39,7 +37,6 @@ export async function GET(
     });
 
     if (!artwork) {
-      console.log(`Artwork ${artworkId} not found in museum ${requestedMuseumId}`);
       return NextResponse.json(
         { error: 'Artwork not found' },
         { status: 404 }
@@ -87,8 +84,6 @@ export async function GET(
         type: note.type
       }))
     };
-
-    console.log(`Found artwork with ${curatorNotes.length} curator notes`);
 
     return NextResponse.json({
       artwork: formattedArtwork,

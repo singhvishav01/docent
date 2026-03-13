@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, ChevronDown, History } from 'lucide-react';
 import { useArtwork } from '@/contexts/ArtworkContext';
 import { PersistentChatInterface } from './PersistentChatInterface';
 
@@ -13,27 +12,38 @@ export function FloatingChatWidget() {
   if (!activeArtwork) return null;
 
   return (
-    <div className="hidden lg:block fixed bottom-6 right-6 z-50">
+    <div className="hidden lg:block" style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50 }}>
       {isOpen ? (
         /* ── Expanded panel ── */
-        <div className="flex flex-col w-[400px] h-[560px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-chat-slide-up">
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          width: '400px', height: '560px',
+          background: '#0D0A07',
+          border: '1px solid rgba(201,168,76,0.2)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(201,168,76,0.06)',
+          overflow: 'hidden',
+        }}>
           {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{activeArtwork.title}</p>
-              <p className="text-xs text-gray-500 truncate">{activeArtwork.artist}</p>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(13,10,7,0.95)', borderBottom: '1px solid rgba(201,168,76,0.12)' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '15px', fontStyle: 'italic', color: '#F2E8D5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>{activeArtwork.title}</p>
+              <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '11px', color: 'rgba(242,232,213,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '0.04em' }}>{activeArtwork.artist}</p>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex-shrink-0 ml-2 p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              style={{ flexShrink: 0, marginLeft: '8px', padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(201,168,76,0.4)', lineHeight: 0 }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.8)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.4)')}
               aria-label="Minimize chat"
             >
-              <ChevronDown className="w-4 h-4" />
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
           </div>
 
           {/* Chat body */}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <PersistentChatInterface
               artworkId={activeArtwork.artworkId}
               museumId={activeArtwork.museumId}
@@ -42,25 +52,28 @@ export function FloatingChatWidget() {
               artworkYear={activeArtwork.year}
             />
           </div>
-
-          {/* Chat History footer */}
-          <div className="flex-shrink-0 border-t border-gray-100 px-4 py-2">
-            <button className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 transition-colors">
-              <History className="w-3.5 h-3.5" />
-              Chat History
-            </button>
-          </div>
         </div>
       ) : (
         /* ── Collapsed bubble ── */
         <button
           onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-2 pl-3 pr-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-xl transition-all duration-200 hover:shadow-2xl"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '12px 20px',
+            background: '#C9A84C',
+            border: 'none', cursor: 'pointer',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+            transition: 'background 0.2s ease',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#F2E8D5')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#C9A84C')}
           aria-label="Open chat"
         >
-          <MessageCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm font-medium max-w-[160px] truncate">
-            {activeArtwork.title}
+          <svg width="16" height="16" fill="none" stroke="#0D0A07" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.2em', color: '#0D0A07', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {activeArtwork.title.toUpperCase()}
           </span>
         </button>
       )}

@@ -15,8 +15,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(`Searching artworks: query="${query}", museum=${museumId || 'all'}`);
-
     // Search in database
     const artworks = await db.artwork.findMany({
       where: {
@@ -49,8 +47,6 @@ export async function GET(req: NextRequest) {
       museum: artwork.museumId,
       museum_name: artwork.museum.name
     }));
-
-    console.log(`Found ${results.length} results`);
 
     return NextResponse.json({
       query,

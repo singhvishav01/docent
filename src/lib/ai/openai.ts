@@ -1,7 +1,6 @@
-// src/lib/openai.ts - Update the ChatContext interface
 import OpenAI from 'openai';
-import { ChunkedArtwork } from './rag/embeddings';
-import { ArtworkData } from './rag/types';
+import { ChunkedArtwork } from '../rag/embeddings';
+import { ArtworkData } from '../rag/types';
 import { DOCENT_PERSONA, DOCENT_VOICE_PERSONA } from './docent-persona';
 
 export interface ChatContext {
@@ -10,7 +9,8 @@ export interface ChatContext {
   museumId?: string;
   query?: string;
   chunks?: ChunkedArtwork[];
-  artwork?: ArtworkData | null; // Added artwork property with proper type
+  artwork?: ArtworkData | null;
+  visitorName?: string;
 }
 
 export interface CompactGroundingContext {
@@ -95,9 +95,14 @@ export function trimChatHistory(
 export function buildSystemPrompt(
   context: CompactGroundingContext,
   artwork?: ArtworkData | null,
-  voice = false
+  voice = false,
+  visitorName?: string
 ): string {
   const persona = voice ? DOCENT_VOICE_PERSONA : DOCENT_PERSONA;
+
+  const visitorLine = visitorName
+    ? `\nVISITOR: You are speaking with ${visitorName}. Use their name naturally — once or twice in the conversation, not on every reply.`
+    : '';
 
   let artworkContext = '';
   if (artwork) {
@@ -112,7 +117,7 @@ Museum: ${artwork.museum_name || artwork.museum}`;
     ? `\nKNOWLEDGE BASE (use as your primary source — do not stray beyond it):\n${context.relevantChunks.join('\n\n')}`
     : '';
 
-  return `${persona}
+  return `${persona}${visitorLine}
 ${artworkContext}
 ${groundingSection}
 
@@ -157,9 +162,7 @@ export async function createChatCompletion(
     const trimmedHistory = trimChatHistory(context.messages, historyTokenLimit);
 
     // Build system prompt with artwork context — voice mode uses shorter, spoken-rhythm prompt
-    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice || stream);
-
-    console.log(`Token usage estimate - System: ${estimateTokens(systemPrompt)}, History: ${estimateTokens(JSON.stringify(trimmedHistory))}, Grounding: ${groundingContext.totalTokensEstimate}`);
+    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice || stream, context.visitorName);
 
     if (stream) {
       // Streaming response

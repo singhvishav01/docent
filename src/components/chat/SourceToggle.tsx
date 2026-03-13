@@ -10,24 +10,29 @@ interface SourceToggleProps {
 
 export function SourceToggle({ showSources, onToggle, curatorNotesCount }: SourceToggleProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       {curatorNotesCount > 0 && (
-        <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-          <FileText className="w-3 h-3" />
-          <span>{curatorNotesCount} notes</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em', color: 'rgba(201,168,76,0.6)', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)', padding: '4px 8px' }}>
+          <FileText size={10} />
+          <span>{curatorNotesCount}</span>
         </div>
       )}
       <button
         onClick={() => onToggle(!showSources)}
-        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
-          showSources 
-            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-        }`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '4px',
+          padding: '5px 10px',
+          background: showSources ? 'rgba(201,168,76,0.12)' : 'rgba(242,232,213,0.04)',
+          border: `1px solid ${showSources ? 'rgba(201,168,76,0.3)' : 'rgba(242,232,213,0.1)'}`,
+          cursor: 'pointer',
+          fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em',
+          color: showSources ? 'rgba(201,168,76,0.8)' : 'rgba(242,232,213,0.3)',
+          transition: 'all 0.2s ease',
+        }}
         title={showSources ? 'Hide source information' : 'Show source information'}
       >
-        {showSources ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-        <span>{showSources ? 'Hide' : 'Show'} Context</span>
+        {showSources ? <EyeOff size={10} /> : <Eye size={10} />}
+        <span>{showSources ? 'HIDE' : 'SHOW'}</span>
       </button>
     </div>
   );

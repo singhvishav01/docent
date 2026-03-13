@@ -11,8 +11,6 @@ export async function GET(
   try {
     const artworkId = params.id
 
-    console.log('[Lookup API] Searching for artwork:', artworkId)
-
     // Query ALL museums to find which one has this artwork
     // Note: Artwork IDs can exist in multiple museums (composite key)
     // We'll return the first match, or you could return all matches
@@ -30,14 +28,11 @@ export async function GET(
     })
 
     if (!artwork) {
-      console.log('[Lookup API] Artwork not found:', artworkId)
       return NextResponse.json(
         { error: 'Artwork not found in any museum' },
         { status: 404 }
       )
     }
-
-    console.log('[Lookup API] Found artwork in museum:', artwork.museumId)
 
     return NextResponse.json({
       id: artwork.id,

@@ -3,13 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { NotFoundException } from '@zxing/library'
-import { Button } from '@/components/ui/Button'
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Camera, CameraOff, RotateCcw, CheckCircle } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 
 interface QRScannerPanelProps {
-  onQRCodeDetected: (artworkId: string) => void  // Changed: now expects just artwork ID
+  onQRCodeDetected: (artworkId: string) => void
   currentArtworkId: string
 }
 
@@ -21,17 +19,14 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0)
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const readerRef = useRef<BrowserMultiFormatReader>()
   const streamRef = useRef<{ stop: () => void } | null>(null)
 
   useEffect(() => {
     readerRef.current = new BrowserMultiFormatReader()
-    
-    return () => {
-      cleanup()
-    }
+    return () => { cleanup() }
   }, [])
 
   const cleanup = () => {
@@ -47,32 +42,21 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
       const videoDevices = await BrowserMultiFormatReader.listVideoInputDevices() || []
       setDevices(videoDevices)
       return videoDevices
-    } catch (error) {
-      console.error('Failed to get video devices:', error)
+    } catch {
       return []
     }
   }
 
   const requestCameraPermission = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Prefer back camera
-      })
-      
-      // Immediately stop the stream, we just needed to check permission
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       stream.getTracks().forEach(track => track.stop())
-      
       setHasPermission(true)
       setError(null)
-      
-      // Get available devices after permission is granted
       await getVideoDevices()
-      
       return true
     } catch (error: any) {
-      console.error('Camera permission error:', error)
       setHasPermission(false)
-      
       if (error.name === 'NotAllowedError') {
         setError('Camera permission denied. Please enable camera access and refresh the page.')
       } else if (error.name === 'NotFoundError') {
@@ -80,38 +64,30 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
       } else {
         setError('Failed to access camera. Please check your browser settings.')
       }
-      
       return false
     }
   }
 
   const startScanning = async () => {
     if (!readerRef.current || !videoRef.current) return
-
     try {
       setIsScanning(true)
       setError(null)
-
-      // Get current device or use default
       const videoDevices = devices.length > 0 ? devices : await getVideoDevices()
       const currentDevice = videoDevices[currentDeviceIndex]
-
       const stream = await readerRef.current.decodeFromVideoDevice(
         currentDevice?.deviceId,
         videoRef.current,
         (result, error) => {
           if (result) {
-            const qrContent = result.getText()
-            handleQRCode(qrContent)
+            handleQRCode(result.getText())
           } else if (error && !(error instanceof NotFoundException)) {
             console.error('QR scan error:', error)
           }
         }
       )
-
       streamRef.current = stream
-    } catch (error: any) {
-      console.error('Scanning error:', error)
+    } catch {
       setError('Failed to start camera. Please try again.')
       setIsScanning(false)
     }
@@ -124,173 +100,168 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
 
   const switchCamera = async () => {
     if (devices.length <= 1) return
-
     stopScanning()
-    
     const nextIndex = (currentDeviceIndex + 1) % devices.length
     setCurrentDeviceIndex(nextIndex)
-    
-    // Small delay to ensure cleanup is complete
-    setTimeout(() => {
-      startScanning()
-    }, 100)
+    setTimeout(() => startScanning(), 100)
   }
 
   const handleQRCode = async (qrContent: string) => {
-    // Prevent processing the same QR code repeatedly
     if (qrContent === lastScannedCode || isProcessing) return
-    
     try {
       setIsProcessing(true)
       setLastScannedCode(qrContent)
-      
-      // QR codes now contain simple artwork IDs (e.g., "washington_crossing", "starry_night")
       const artworkId = qrContent.trim()
-
-      if (!artworkId) {
-        toast.error('Invalid QR code - empty content')
-        return
-      }
-
-      // Check if this is the same artwork we're already viewing
-      if (artworkId === currentArtworkId) {
-        toast.success('Already viewing this artwork')
-        return
-      }
-
-      toast.success(`Loading artwork...`)
-      
-      // Pass the artwork ID to the parent handler
+      if (!artworkId) { toast.error('Invalid QR code'); return }
+      if (artworkId === currentArtworkId) { toast.success('Already viewing this artwork'); return }
+      toast.success('Artwork found')
       await onQRCodeDetected(artworkId)
-      
-    } catch (error) {
-      console.error('QR code parsing error:', error)
+    } catch {
       toast.error('Failed to process QR code')
     } finally {
       setIsProcessing(false)
-      
-      // Clear the last scanned code after a delay to allow re-scanning
-      setTimeout(() => {
-        setLastScannedCode(null)
-      }, 3000)
+      setTimeout(() => setLastScannedCode(null), 3000)
     }
   }
 
   const initializeScanner = async () => {
-    const hasPermission = await requestCameraPermission()
-    if (hasPermission) {
-      await startScanning()
-    }
+    const ok = await requestCameraPermission()
+    if (ok) await startScanning()
   }
 
+  // ── Permission not yet requested ──────────────────────────────────────────
   if (hasPermission === null) {
     return (
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto flex items-center justify-center">
-          <Camera className="w-8 h-8 text-gray-400" />
+      <div style={{ textAlign: 'center', padding: '32px 0' }}>
+        <div style={{ width: '64px', height: '64px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <Camera size={28} color="rgba(201,168,76,0.4)" />
         </div>
-        <div>
-          <h4 className="font-medium text-gray-900 mb-2">Camera Access Required</h4>
-          <p className="text-xs text-gray-600 mb-4">
-            Enable camera access to scan QR codes for artworks.
-          </p>
-          <Button onClick={initializeScanner} size="sm">
-            <Camera className="w-4 h-4 mr-2" />
-            Enable Camera
-          </Button>
-        </div>
+        <p style={{ fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em', color: 'rgba(201,168,76,0.6)', marginBottom: '8px' }}>CAMERA ACCESS REQUIRED</p>
+        <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '12px', fontWeight: 300, color: 'rgba(242,232,213,0.35)', marginBottom: '24px', lineHeight: 1.6 }}>
+          Enable camera access to scan QR codes for artworks.
+        </p>
+        <button
+          onClick={initializeScanner}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '11px 28px', background: '#C9A84C', border: 'none', cursor: 'pointer', fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em', color: '#0D0A07', transition: 'background 0.2s ease' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#F2E8D5')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#C9A84C')}
+        >
+          <Camera size={14} />
+          ENABLE CAMERA
+        </button>
       </div>
     )
   }
 
+  // ── Permission denied ─────────────────────────────────────────────────────
   if (!hasPermission) {
     return (
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 bg-red-100 rounded-full mx-auto flex items-center justify-center">
-          <CameraOff className="w-8 h-8 text-red-500" />
+      <div style={{ textAlign: 'center', padding: '32px 0' }}>
+        <div style={{ width: '64px', height: '64px', background: 'rgba(166,123,107,0.08)', border: '1px solid rgba(166,123,107,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <CameraOff size={28} color="rgba(166,123,107,0.6)" />
         </div>
-        <div>
-          <h4 className="font-medium text-gray-900 mb-2">Camera Access Denied</h4>
-          <p className="text-xs text-gray-600 mb-4">
-            {error || 'Please enable camera access in your browser settings.'}
-          </p>
-          <Button onClick={() => window.location.reload()} size="sm">
-            Refresh Page
-          </Button>
-        </div>
+        <p style={{ fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em', color: 'rgba(166,123,107,0.7)', marginBottom: '8px' }}>CAMERA ACCESS DENIED</p>
+        <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '12px', fontWeight: 300, color: 'rgba(242,232,213,0.35)', marginBottom: '24px', lineHeight: 1.6 }}>
+          {error || 'Please enable camera access in your browser settings.'}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ padding: '10px 24px', background: 'rgba(242,232,213,0.05)', border: '1px solid rgba(242,232,213,0.15)', cursor: 'pointer', fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em', color: 'rgba(242,232,213,0.5)' }}
+        >
+          REFRESH PAGE
+        </button>
       </div>
     )
   }
 
+  // ── Scanner active ────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
-      <div className="relative">
+    <div>
+      {/* Video feed */}
+      <div style={{ position: 'relative', marginBottom: '16px' }}>
         <video
           ref={videoRef}
-          className="w-full h-48 bg-black rounded-lg object-cover"
+          style={{ width: '100%', height: '220px', background: '#000', display: 'block', objectFit: 'cover' }}
           playsInline
           muted
         />
-        
-        {/* Scanning overlay */}
-        <div className="absolute inset-0 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none">
-          <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-blue-400"></div>
-          <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-blue-400"></div>
-          <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-blue-400"></div>
-          <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-blue-400"></div>
-          
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-              {isProcessing ? 'Processing...' : 'Scan artwork QR code'}
-            </div>
+
+        {/* Corner markers */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {/* top-left */}
+          <div style={{ position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderTop: '2px solid #C9A84C', borderLeft: '2px solid #C9A84C' }} />
+          {/* top-right */}
+          <div style={{ position: 'absolute', top: '8px', right: '8px', width: '20px', height: '20px', borderTop: '2px solid #C9A84C', borderRight: '2px solid #C9A84C' }} />
+          {/* bottom-left */}
+          <div style={{ position: 'absolute', bottom: '8px', left: '8px', width: '20px', height: '20px', borderBottom: '2px solid #C9A84C', borderLeft: '2px solid #C9A84C' }} />
+          {/* bottom-right */}
+          <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '20px', height: '20px', borderBottom: '2px solid #C9A84C', borderRight: '2px solid #C9A84C' }} />
+          {/* Centre label */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ background: 'rgba(13,10,7,0.7)', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(201,168,76,0.8)', padding: '5px 12px', border: '1px solid rgba(201,168,76,0.2)' }}>
+              {isProcessing ? 'PROCESSING...' : 'POINT AT QR CODE'}
+            </span>
           </div>
         </div>
 
+        {/* Loading overlay */}
         {!isScanning && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
-            <LoadingSpinner className="text-white" />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(13,10,7,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '24px', height: '24px', border: '1px solid rgba(201,168,76,0.3)', borderTopColor: '#C9A84C', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           </div>
         )}
 
+        {/* Success overlay */}
         {isProcessing && (
-          <div className="absolute inset-0 bg-green-500 bg-opacity-20 flex items-center justify-center rounded-lg">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(201,168,76,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircle size={32} color="#C9A84C" />
           </div>
         )}
       </div>
 
-      <div className="flex gap-2 justify-center">
+      {/* Controls */}
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
         {!isScanning ? (
-          <Button onClick={startScanning} disabled={!hasPermission} size="sm">
-            <Camera className="w-4 h-4 mr-1" />
-            Start
-          </Button>
+          <button
+            onClick={startScanning}
+            disabled={!hasPermission}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 20px', background: '#C9A84C', border: 'none', cursor: 'pointer', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.25em', color: '#0D0A07', transition: 'background 0.2s ease' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#F2E8D5')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#C9A84C')}
+          >
+            <Camera size={12} />
+            START
+          </button>
         ) : (
-          <Button onClick={stopScanning} variant="outline" size="sm">
-            <CameraOff className="w-4 h-4 mr-1" />
-            Stop
-          </Button>
+          <button
+            onClick={stopScanning}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 20px', background: 'rgba(242,232,213,0.05)', border: '1px solid rgba(242,232,213,0.15)', cursor: 'pointer', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(242,232,213,0.5)', transition: 'all 0.2s ease' }}
+          >
+            <CameraOff size={12} />
+            STOP
+          </button>
         )}
 
         {devices.length > 1 && (
-          <Button onClick={switchCamera} variant="outline" size="sm">
-            <RotateCcw className="w-4 h-4" />
-          </Button>
+          <button
+            onClick={switchCamera}
+            style={{ padding: '9px 14px', background: 'rgba(242,232,213,0.04)', border: '1px solid rgba(201,168,76,0.15)', cursor: 'pointer', color: 'rgba(201,168,76,0.5)', lineHeight: 0, transition: 'all 0.2s ease' }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.4)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.15)')}
+            title="Switch camera"
+          >
+            <RotateCcw size={14} />
+          </button>
         )}
       </div>
 
-      {isScanning && (
-        <div className="text-center">
-          <p className="text-xs text-gray-600">
-            QR code contains artwork ID (e.g., "washington_crossing")
-          </p>
-          {devices.length > 1 && (
-            <p className="text-xs text-gray-500 mt-1">
-              Camera {currentDeviceIndex + 1}/{devices.length}
-            </p>
-          )}
-        </div>
+      {isScanning && devices.length > 1 && (
+        <p style={{ textAlign: 'center', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em', color: 'rgba(201,168,76,0.3)' }}>
+          CAMERA {currentDeviceIndex + 1} / {devices.length}
+        </p>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

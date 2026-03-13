@@ -4,7 +4,12 @@
       "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\src\\\\app\\\\api\\\\artworks:*)",
       "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent:*)",
       "Bash(npx tsx:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(ls C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\node_modules\\\\concurrently:*)",
+      "Bash(cd:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
     ]
   }
 }

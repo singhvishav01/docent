@@ -8,6 +8,8 @@ import { WinstonVoiceManager, VoiceMode } from '@/lib/voice/WinstonVoiceManager'
 import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
 import { VoiceTourButton } from '../voice/VoiceTourButton';
 import { useSession } from '@/contexts/SessionProvider';
+import { useVisitor } from '@/contexts/VisitorContext';
+import { useArtwork } from '@/contexts/ArtworkContext';
 
 interface ChatMessage {
   id: string;
@@ -15,7 +17,7 @@ interface ChatMessage {
   isUser: boolean;
   role: 'user' | 'assistant';
   timestamp: Date;
-  artworkId: string; // Track which artwork this message is about
+  artworkId: string;
   artworkInfo?: {
     id: string;
     title: string;
@@ -34,36 +36,39 @@ interface PersistentChatInterfaceProps {
   artworkYear?: number;
 }
 
-export function PersistentChatInterface({ 
-  artworkId, 
-  museumId = 'met', 
+export function PersistentChatInterface({
+  artworkId,
+  museumId = 'met',
   artworkTitle,
   artworkArtist,
   artworkYear
 }: PersistentChatInterfaceProps) {
   const session = useSession();
-  
-  // Local UI state
+  const { visitorName } = useVisitor();
+  const { activeArtwork: contextArtwork } = useArtwork();
+
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSources, setShowSources] = useState(false);
-  const [currentArtwork, setCurrentArtwork] = useState<any>(null);
   const [actualMuseumId, setActualMuseumId] = useState<string>(museumId);
-  
-  // Voice state
+
+  // Use full artwork from context if available (set by ArtworkPage) to avoid
+  // redundant fetches — falls back to local state for standalone usage
+  const contextFull = contextArtwork?.artworkId === artworkId ? contextArtwork.full : null;
+  const [fetchedArtwork, setFetchedArtwork] = useState<any>(null);
+  const currentArtwork = contextFull ?? fetchedArtwork;
+
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('dormant');
   const [isInitializingVoice, setIsInitializingVoice] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [voiceSupported, setVoiceSupported] = useState(false);
-  
-  // Track last artwork to detect changes
+
   const lastArtworkIdRef = useRef<string>(artworkId);
   const isTransitioningRef = useRef(false);
-  
+
   const voiceManager = useRef<WinstonVoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Ref to always call the latest handleVoiceInput (avoids stale closure in voice manager callback)
   const handleVoiceInputRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   const scrollToBottom = () => {
@@ -74,36 +79,32 @@ export function PersistentChatInterface({
     scrollToBottom();
   }, [session.messages]);
 
-  // Check voice support on mount
   useEffect(() => {
     setVoiceSupported(WinstonVoiceManager.isSupported());
   }, []);
 
-  // Load artwork data when artworkId changes
   useEffect(() => {
+    // If ArtworkPage already put the full data in context, use it — no fetch needed
+    if (contextFull) {
+      setActualMuseumId(contextFull.museumId || museumId);
+      return;
+    }
+    // Fallback: standalone usage (e.g. admin test-chat page) — fetch directly
     const loadArtwork = async () => {
       try {
         const response = await fetch(`/api/artworks/${artworkId}?museum=${museumId}`);
         if (response.ok) {
           const data = await response.json();
-          const artwork = data.artwork;
-          setCurrentArtwork(artwork);
-          
-          if (data.museum && data.museum !== museumId) {
-            setActualMuseumId(data.museum);
-          } else {
-            setActualMuseumId(museumId);
-          }
+          setFetchedArtwork(data.artwork);
+          setActualMuseumId(data.museum && data.museum !== museumId ? data.museum : museumId);
         }
       } catch (error) {
         console.error('Failed to load artwork:', error);
       }
     };
-
     loadArtwork();
-  }, [artworkId, museumId]);
+  }, [artworkId, museumId, contextFull]);
 
-  // Handle artwork transitions
   useEffect(() => {
     const handleArtworkTransition = async () => {
       if (lastArtworkIdRef.current === artworkId) return;
@@ -111,30 +112,25 @@ export function PersistentChatInterface({
       const previousArtworkId = lastArtworkIdRef.current;
       lastArtworkIdRef.current = artworkId;
 
-      if (!artworkTitle) return; // Wait until new artwork info is loaded
+      if (!artworkTitle) return;
 
       console.log(`[PersistentChat] 🎨 Transition: ${previousArtworkId} → ${artworkId}`);
       isTransitioningRef.current = true;
 
       try {
-        // Let the current sentence finish naturally, drop everything else
         if (voiceManager.current && voiceMode === 'speaking') {
           voiceManager.current.clearQueueKeepCurrent();
           await voiceManager.current.waitForCurrentSentence(4000);
         }
 
-        // Collect last few messages for context (previous artwork's conversation)
         const lastMessages = session.messages
           .filter(m => m.artworkId === previousArtworkId)
           .slice(-4)
           .map(m => ({ role: m.role, content: m.content }));
 
-        // Grab the previous artwork title/artist from the last message's artworkInfo
-        // (currentArtwork still holds previous info at this point since state lags)
         const prevTitle = currentArtwork?.title ?? undefined;
         const prevArtist = currentArtwork?.artist ?? undefined;
 
-        // Ask AI to generate a natural transition sentence
         let transitionText: string;
         try {
           const res = await fetch('/api/chat/transition', {
@@ -152,13 +148,9 @@ export function PersistentChatInterface({
           const data = await res.json();
           transitionText = data.transition;
         } catch {
-          // Fallback if API call fails
           transitionText = `Moving on to "${artworkTitle}"${artworkArtist ? ` by ${artworkArtist}` : ''}${artworkYear ? `, ${artworkYear}` : ''}.`;
         }
 
-        console.log(`[PersistentChat] 📢 Transition text: "${transitionText}"`);
-
-        // Add to chat for all modes
         const transitionMessage: ChatMessage = {
           id: `transition-${artworkId}-${Date.now()}`,
           content: transitionText,
@@ -175,7 +167,6 @@ export function PersistentChatInterface({
         };
         session.addMessage(transitionMessage);
 
-        // Speak it if voice tour is active
         if (session.isVoiceTourActive && voiceManager.current) {
           voiceManager.current.enqueueSentence(transitionText);
           voiceManager.current.finalizeQueue();
@@ -190,14 +181,10 @@ export function PersistentChatInterface({
     handleArtworkTransition();
   }, [artworkId, artworkTitle, artworkArtist, artworkYear, session, currentArtwork, voiceMode]);
 
-  // Initialize voice manager
   useEffect(() => {
     if (!voiceManager.current && voiceSupported) {
-      voiceManager.current = new WinstonVoiceManager({
-        silenceTimeout: 30000 // 30 seconds
-      });
+      voiceManager.current = new WinstonVoiceManager({ silenceTimeout: 30000 });
 
-      // Set up voice event listeners
       voiceManager.current.onModeChanged((mode) => {
         setVoiceMode(mode);
       });
@@ -205,7 +192,6 @@ export function PersistentChatInterface({
       voiceManager.current.onTranscriptReceived((text, isFinal) => {
         if (isFinal) {
           setInterimTranscript('');
-          // Use ref so we always call the latest version (avoids stale closure)
           handleVoiceInputRef.current(text);
         } else {
           setInterimTranscript(text);
@@ -227,24 +213,18 @@ export function PersistentChatInterface({
     };
   }, [voiceSupported]);
 
-  // Handle session pause/resume
   useEffect(() => {
     if (session.isPaused && voiceManager.current) {
-      console.log('[PersistentChat] ⏸️  Session paused - stopping voice');
       voiceManager.current.stopListening();
     }
   }, [session.isPaused]);
 
   const handleStartVoiceTour = async () => {
     if (!voiceManager.current || !currentArtwork) return;
-
-    console.log('[PersistentChat] 🎬 Starting voice tour session...');
     setIsInitializingVoice(true);
-
     try {
-      await voiceManager.current.startTour(currentArtwork.id, currentArtwork.title);
+      await voiceManager.current.startTour(currentArtwork.id, currentArtwork.title, visitorName);
       session.startVoiceTour();
-      console.log('[PersistentChat] ✅ Voice tour activated globally');
     } catch (error) {
       console.error('[PersistentChat] ❌ Failed to start voice tour:', error);
       alert('Failed to start voice tour. Please check your microphone permissions.');
@@ -254,21 +234,16 @@ export function PersistentChatInterface({
   };
 
   const handleStopVoiceTour = () => {
-    console.log('[PersistentChat] 🛑 Ending voice tour session...');
     if (voiceManager.current) {
       voiceManager.current.stopTour();
       session.endVoiceTour();
       setInterimTranscript('');
-      console.log('[PersistentChat] ✅ Voice tour deactivated globally');
     }
   };
 
   const handleVoiceInput = async (transcript: string) => {
     if (!transcript.trim() || isTransitioningRef.current) return;
-
-    session.updateActivity(); // Reset inactivity timer
-
-    // Add user message
+    session.updateActivity();
     const userMessage: ChatMessage = {
       id: `user-voice-${Date.now()}`,
       content: transcript,
@@ -277,22 +252,15 @@ export function PersistentChatInterface({
       timestamp: new Date(),
       artworkId: artworkId
     };
-
     session.addMessage(userMessage);
-
-    // Get AI response
     await sendMessageToAI(transcript, true);
   };
 
-  // Keep the ref pointing to the latest handleVoiceInput so the voice manager
-  // callback never captures a stale closure (e.g. old isVoiceTourActive value)
   handleVoiceInputRef.current = handleVoiceInput;
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
-
-    session.updateActivity(); // Reset inactivity timer
-
+    session.updateActivity();
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       content: inputMessage,
@@ -301,26 +269,17 @@ export function PersistentChatInterface({
       timestamp: new Date(),
       artworkId: artworkId
     };
-
     session.addMessage(userMessage);
     setInputMessage('');
     setIsLoading(true);
-
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-    }
-
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     await sendMessageToAI(userMessage.content, false);
   };
 
   const sendMessageToAI = async (content: string, isVoiceInput: boolean) => {
-    console.log(`[PersistentChat] 📤 Sending (voice: ${isVoiceInput}): "${content.substring(0, 50)}..."`);
-
     const useStreaming = isVoiceInput && session.isVoiceTourActive && !!voiceManager.current;
     setIsLoading(true);
 
-    // Build conversation history for this artwork — last 8 messages gives enough
-    // context for the AI to understand short replies like "yes", "yep", "go on"
     const conversationHistory = session.messages
       .filter(m => m.artworkId === artworkId)
       .slice(-8)
@@ -336,6 +295,7 @@ export function PersistentChatInterface({
           museumId: actualMuseumId,
           artworkTitle: currentArtwork?.title,
           artworkArtist: currentArtwork?.artist,
+          visitorName: visitorName || null,
           stream: useStreaming,
           conversationHistory,
         }),
@@ -344,9 +304,6 @@ export function PersistentChatInterface({
       if (!response.ok) throw new Error(`Chat API error: ${response.status}`);
 
       if (useStreaming && voiceManager.current) {
-        // ── STREAMING VOICE PATH ─────────────────────────────────────────────
-        // Speech starts on the very first complete sentence while the rest
-        // of the response is still being generated.
         setIsLoading(false);
 
         const reader = response.body!.getReader();
@@ -356,7 +313,6 @@ export function PersistentChatInterface({
 
         const extractSentences = (text: string): { sentences: string[]; remaining: string } => {
           const sentences: string[] = [];
-          // Match any run of text ending with .!? (optionally followed by closing quote)
           const re = /[^.!?]+[.!?]["']?/g;
           let lastIndex = 0;
           let m: RegExpExecArray | null;
@@ -375,15 +331,12 @@ export function PersistentChatInterface({
             const chunk = decoder.decode(value, { stream: true });
             fullText += chunk;
             sentenceBuffer += chunk;
-
             const { sentences, remaining } = extractSentences(sentenceBuffer);
             sentenceBuffer = remaining;
             for (const s of sentences) {
               voiceManager.current!.enqueueSentence(s);
             }
           }
-
-          // Speak any trailing text that didn't end with punctuation
           if (sentenceBuffer.trim()) {
             voiceManager.current!.enqueueSentence(sentenceBuffer.trim());
           }
@@ -391,32 +344,27 @@ export function PersistentChatInterface({
           console.error('[PersistentChat] ❌ Stream read error:', streamErr);
         }
 
-        // Signal end of response — queue will resume listening once empty
         voiceManager.current!.finalizeQueue();
 
-        // Add the complete message to chat
         if (fullText.trim()) {
-          const aiMessage: ChatMessage = {
+          session.addMessage({
             id: `ai-${Date.now()}`,
             content: fullText.trim(),
             isUser: false,
             role: 'assistant',
             timestamp: new Date(),
             artworkId,
-          };
-          session.addMessage(aiMessage);
+          });
         }
 
       } else {
-        // ── NON-STREAMING TEXT PATH ──────────────────────────────────────────
         const data = await response.json();
-        console.log(`[PersistentChat] 📥 Received: "${data.response?.substring(0, 50)}..."`);
 
         if (data.actualMuseumId && data.actualMuseumId !== actualMuseumId) {
           setActualMuseumId(data.actualMuseumId);
         }
 
-        const aiMessage: ChatMessage = {
+        session.addMessage({
           id: `ai-${Date.now()}`,
           content: data.response || 'I apologize, but I received an empty response. Please try again.',
           isUser: false,
@@ -431,9 +379,7 @@ export function PersistentChatInterface({
           } : undefined,
           contextUsed: data.context_used,
           curatorNotesCount: data.curator_notes_count,
-        };
-
-        session.addMessage(aiMessage);
+        });
         setIsLoading(false);
       }
 
@@ -463,59 +409,23 @@ export function PersistentChatInterface({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
-    
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* ==================== HEADER ==================== */}
-      <div className="flex-shrink-0 border-b border-gray-200">
-        {/* Desktop/Tablet Header */}
-        <div className="hidden sm:flex items-center justify-between p-3 sm:p-4">
-          <div className="flex-1 min-w-0">
-            {currentArtwork ? (
-              <div className="text-sm">
-                <h3 className="font-semibold text-gray-800 truncate">{currentArtwork.title}</h3>
-                <p className="text-gray-600 truncate">{currentArtwork.artist}{currentArtwork.year ? ` (${currentArtwork.year})` : ''}</p>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">Loading...</div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 ml-4">
-            {voiceSupported && (
-              <VoiceTourButton
-                isActive={session.isVoiceTourActive}
-                isInitializing={isInitializingVoice}
-                onStart={handleStartVoiceTour}
-                onStop={handleStopVoiceTour}
-                disabled={!currentArtwork}
-              />
-            )}
-            <SourceToggle 
-              showSources={showSources} 
-              onToggle={setShowSources}
-              curatorNotesCount={currentArtwork?.curator_notes?.length || 0}
-            />
-          </div>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0D0A07' }}>
 
-        {/* Mobile Header */}
-        <div className="sm:hidden flex flex-col gap-2 p-3 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800 truncate">
-                {currentArtwork?.title || 'Loading...'}
-              </p>
-            </div>
-            <SourceToggle 
-              showSources={showSources} 
-              onToggle={setShowSources}
-              curatorNotesCount={currentArtwork?.curator_notes?.length || 0}
-            />
-          </div>
+      {/* ==================== HEADER ==================== */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(201,168,76,0.1)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {currentArtwork ? (
+            <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '14px', fontStyle: 'italic', color: 'rgba(242,232,213,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentArtwork.title}</p>
+          ) : (
+            <p style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em', color: 'rgba(201,168,76,0.3)' }}>LOADING...</p>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           {voiceSupported && (
             <VoiceTourButton
               isActive={session.isVoiceTourActive}
@@ -525,63 +435,69 @@ export function PersistentChatInterface({
               disabled={!currentArtwork}
             />
           )}
+          <SourceToggle
+            showSources={showSources}
+            onToggle={setShowSources}
+            curatorNotesCount={currentArtwork?.curator_notes?.length || 0}
+          />
         </div>
       </div>
 
       {/* Voice Mode Indicator */}
       {session.isVoiceTourActive && (
-        <div className="flex-shrink-0 p-3 border-b border-gray-100">
+        <div style={{ flexShrink: 0, padding: '10px 16px', borderBottom: '1px solid rgba(201,168,76,0.08)' }}>
           <VoiceModeIndicator mode={voiceMode} interimTranscript={interimTranscript} />
         </div>
       )}
 
       {/* Pause Indicator */}
       {session.isPaused && (
-        <div className="flex-shrink-0 bg-yellow-50 border-b border-yellow-200 p-3">
-          <div className="flex items-center gap-2 text-sm text-yellow-800">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div style={{ flexShrink: 0, background: 'rgba(201,168,76,0.06)', borderBottom: '1px solid rgba(201,168,76,0.15)', padding: '10px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Raleway', sans-serif", fontSize: '12px', color: 'rgba(201,168,76,0.7)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>Session paused due to inactivity. Speak or type to resume.</span>
+            Session paused due to inactivity. Speak or type to resume.
           </div>
         </div>
       )}
 
       {/* ==================== MESSAGES ==================== */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
-        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {session.messages.map((message) => (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
+            <MessageBubble
+              key={message.id}
+              message={message}
               showSources={showSources}
             />
           ))}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg p-3 max-w-xs">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ background: 'rgba(242,232,213,0.04)', border: '1px solid rgba(242,232,213,0.08)', padding: '12px 16px' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[0, 0.15, 0.3].map((delay, i) => (
+                    <div key={i} style={{ width: '6px', height: '6px', background: 'rgba(201,168,76,0.4)', borderRadius: '50%', animation: 'bounce 1.2s infinite', animationDelay: `${delay}s` }} />
+                  ))}
                 </div>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
+        <style>{`@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }`}</style>
       </div>
 
       {/* ==================== SOURCE PANEL ==================== */}
       {showSources && currentArtwork && (
-        <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 max-h-40 overflow-y-auto">
-          <div className="p-3 sm:p-4">
-            <h4 className="font-semibold text-xs sm:text-sm text-gray-700 mb-2">Current Context:</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Museum:</strong> {actualMuseumId}</p>
-              <p><strong>Artwork:</strong> {currentArtwork.title}</p>
+        <div style={{ flexShrink: 0, borderTop: '1px solid rgba(201,168,76,0.1)', background: 'rgba(201,168,76,0.04)', maxHeight: '120px', overflowY: 'auto' }}>
+          <div style={{ padding: '12px 16px' }}>
+            <h4 style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(201,168,76,0.5)', marginBottom: '8px' }}>CONTEXT</h4>
+            <div style={{ fontFamily: "'Raleway', sans-serif", fontSize: '11px', color: 'rgba(242,232,213,0.4)', lineHeight: 1.6 }}>
+              <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Museum:</span> {actualMuseumId}</p>
+              <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Artwork:</span> {currentArtwork.title}</p>
               {currentArtwork.curator_notes && currentArtwork.curator_notes.length > 0 && (
-                <p><strong>Curator Notes:</strong> {currentArtwork.curator_notes.length} available</p>
+                <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Curator Notes:</span> {currentArtwork.curator_notes.length} available</p>
               )}
             </div>
           </div>
@@ -589,38 +505,71 @@ export function PersistentChatInterface({
       )}
 
       {/* ==================== INPUT ==================== */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-        <div className="p-3 sm:p-4">
+      <div style={{ flexShrink: 0, borderTop: '1px solid rgba(201,168,76,0.1)', background: '#0D0A07' }}>
+        <div style={{ padding: '12px 16px' }}>
           {session.isVoiceTourActive && (
-            <div className="text-center py-2 text-sm text-gray-500">
-              <p>Voice tour active - speak naturally or type below</p>
+            <div style={{ textAlign: 'center', paddingBottom: '8px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', color: 'rgba(242,232,213,0.3)', letterSpacing: '0.04em' }}>
+              Voice tour active — speak naturally or type below
             </div>
           )}
-          
-          <div className="flex items-end gap-2">
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
               placeholder={
-                session.isVoiceTourActive 
-                  ? "Speak or type your question..." 
-                  : currentArtwork 
-                    ? `Ask about "${currentArtwork.title}"...` 
+                session.isVoiceTourActive
+                  ? "Speak or type your question..."
+                  : currentArtwork
+                    ? `Ask about "${currentArtwork.title}"...`
                     : "Ask me anything..."
               }
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base min-h-[44px] max-h-[120px]"
               disabled={isLoading}
               rows={1}
-              style={{ height: 'auto' }}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                background: 'rgba(242,232,213,0.04)',
+                border: '1px solid rgba(201,168,76,0.15)',
+                outline: 'none',
+                resize: 'none',
+                overflow: 'hidden',
+                fontFamily: "'Raleway', sans-serif",
+                fontSize: '13px',
+                fontWeight: 300,
+                color: '#F2E8D5',
+                letterSpacing: '0.03em',
+                minHeight: '44px',
+                maxHeight: '120px',
+                height: 'auto',
+                lineHeight: 1.5,
+                transition: 'border-color 0.2s ease',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.4)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(201,168,76,0.15)')}
             />
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0 min-h-[44px] text-sm sm:text-base font-medium"
+              style={{
+                padding: '10px 18px',
+                background: (!inputMessage.trim() || isLoading) ? 'rgba(201,168,76,0.2)' : '#C9A84C',
+                border: 'none',
+                cursor: (!inputMessage.trim() || isLoading) ? 'default' : 'pointer',
+                fontFamily: "'Cinzel', serif",
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: (!inputMessage.trim() || isLoading) ? 'rgba(201,168,76,0.4)' : '#0D0A07',
+                flexShrink: 0,
+                minHeight: '44px',
+                transition: 'background 0.2s ease',
+              }}
+              onMouseEnter={e => { if (inputMessage.trim() && !isLoading) e.currentTarget.style.background = '#F2E8D5'; }}
+              onMouseLeave={e => { if (inputMessage.trim() && !isLoading) e.currentTarget.style.background = '#C9A84C'; }}
             >
-              Send
+              SEND
             </button>
           </div>
         </div>

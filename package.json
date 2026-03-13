@@ -18,13 +18,14 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "import-json": "tsx scripts/import-json-to-db.ts",
-    "import-csv": "tsx scripts/import-csv-to-db.ts",
+    "import-json": "tsx scripts/data/import-json-to-db.ts",
+    "import-csv": "tsx scripts/data/import-csv-to-db.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "seed-dev": "SEED=1 npm run dev",
-    "move-images": "tsx scripts/move-images.ts",
-    "serve:images": "cd ../docent-assets && node serve.js"
+    "move-images": "tsx scripts/utils/move-images.ts",
+    "serve:images": "cd ../docent-assets && node serve.js",
+    "dev:full": "concurrently --names \"next,images\" --prefix-colors \"blue,yellow\" \"npm run dev\" \"npm run serve:images\""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -62,6 +63,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "autoprefixer": "^10.4.0",
+    "concurrently": "^9.2.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",

@@ -10,86 +10,47 @@ interface VoiceModeIndicatorProps {
 }
 
 export function VoiceModeIndicator({ mode, interimTranscript }: VoiceModeIndicatorProps) {
-  const getModeConfig = () => {
-    switch (mode) {
-      case 'listening':
-        return {
-          icon: Mic,
-          label: 'Listening',
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          pulse: true
-        };
-      case 'thinking':
-        return {
-          icon: Brain,
-          label: 'Processing',
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200',
-          pulse: false
-        };
-      case 'speaking':
-        return {
-          icon: Volume2,
-          label: 'Speaking',
-          color: 'text-purple-600',
-          bgColor: 'bg-purple-50',
-          borderColor: 'border-purple-200',
-          pulse: true
-        };
-      default:
-        return {
-          icon: MicOff,
-          label: 'Inactive',
-          color: 'text-gray-400',
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
-          pulse: false
-        };
-    }
+  if (mode === 'dormant') return null;
+
+  const configs: Record<string, { icon: any; label: string; color: string; pulse: boolean }> = {
+    listening: { icon: Mic, label: 'LISTENING', color: 'rgba(120,200,120,0.8)', pulse: true },
+    thinking:  { icon: Brain, label: 'PROCESSING', color: 'rgba(201,168,76,0.8)', pulse: false },
+    speaking:  { icon: Volume2, label: 'SPEAKING', color: 'rgba(180,140,220,0.8)', pulse: true },
+    default:   { icon: MicOff, label: 'INACTIVE', color: 'rgba(242,232,213,0.25)', pulse: false },
   };
 
-  const config = getModeConfig();
+  const config = configs[mode] ?? configs.default;
   const Icon = config.icon;
 
-  if (mode === 'dormant') {
-    return null;
-  }
-
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${config.bgColor} ${config.borderColor}`}>
-      {/* Icon with pulse animation */}
-      <div className="relative">
-        <Icon className={`w-5 h-5 ${config.color}`} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'rgba(242,232,213,0.03)', border: '1px solid rgba(201,168,76,0.1)' }}>
+      <div style={{ position: 'relative', lineHeight: 0 }}>
+        <Icon size={16} color={config.color} />
         {config.pulse && (
-          <span className={`absolute inset-0 rounded-full ${config.bgColor} animate-ping opacity-75`} />
+          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: config.color, opacity: 0.3, animation: 'ping 1.5s cubic-bezier(0,0,0.2,1) infinite' }} />
         )}
       </div>
 
-      {/* Status text */}
-      <div className="flex-1 min-w-0">
-        <div className={`text-sm font-medium ${config.color}`}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.25em', color: config.color }}>
           {config.label}
         </div>
-        
-        {/* Show interim transcript while listening */}
         {mode === 'listening' && interimTranscript && (
-          <div className="text-xs text-gray-600 italic mt-1 truncate">
+          <div style={{ fontFamily: "'Raleway', sans-serif", fontSize: '11px', fontStyle: 'italic', color: 'rgba(242,232,213,0.4)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             "{interimTranscript}"
           </div>
         )}
       </div>
 
-      {/* Visual indicator */}
       {mode === 'listening' && (
-        <div className="flex gap-1">
-          <div className="w-1 h-4 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-1 h-4 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-1 h-4 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+        <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+          {[0, 150, 300].map((delay) => (
+            <div key={delay} style={{ width: '3px', height: '14px', background: 'rgba(120,200,120,0.6)', animation: 'pulse 1s ease-in-out infinite', animationDelay: `${delay}ms` }} />
+          ))}
         </div>
       )}
+
+      <style>{`@keyframes ping { 75%,100% { transform: scale(2); opacity: 0; } } @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }`}</style>
     </div>
   );
 }

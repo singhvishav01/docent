@@ -12,89 +12,74 @@ interface QRScannerModalProps {
   currentArtworkId: string;
 }
 
-export function QRScannerModal({ 
-  isOpen, 
-  onClose, 
-  onQRDetected, 
-  currentArtworkId 
+export function QRScannerModal({
+  isOpen,
+  onClose,
+  onQRDetected,
+  currentArtworkId
 }: QRScannerModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
+      if (e.key === 'Escape' && isOpen) onClose();
     };
-
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    document.body.style.overflow = isOpen ? 'hidden' : 'unset';
+    return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
-
-  const handleQRDetected = (qrContent: string) => {
-    onQRDetected(qrContent);
-    // Don't close modal immediately - let parent handle it
-  };
 
   if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-60 z-50 backdrop-blur-sm transition-opacity"
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 50, backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
+      <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+        <div
           ref={modalRef}
-          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200"
-          onClick={(e) => e.stopPropagation()}
+          style={{ background: '#0D0A07', border: '1px solid rgba(201,168,76,0.2)', boxShadow: '0 24px 60px rgba(0,0,0,0.8)', maxWidth: '512px', width: '100%', maxHeight: '90vh', overflow: 'hidden' }}
+          onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: 'rgba(13,10,7,0.95)', borderBottom: '1px solid rgba(201,168,76,0.12)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <svg width="18" height="18" fill="none" stroke="rgba(201,168,76,0.7)" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
-              Scan Next Artwork
-            </h2>
+              <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '11px', letterSpacing: '0.3em', color: '#F2E8D5' }}>SCAN NEXT ARTWORK</h2>
+            </div>
             <button
               onClick={onClose}
-              className="hover:bg-blue-800 p-2 rounded-lg transition-colors"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(201,168,76,0.4)', padding: '4px', lineHeight: 0, transition: 'color 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.8)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(201,168,76,0.4)')}
               aria-label="Close scanner"
             >
-              <X className="w-6 h-6" />
+              <X size={18} />
             </button>
           </div>
 
           {/* Scanner Content */}
-          <div className="p-6">
+          <div style={{ padding: '24px' }}>
             <QRScannerPanel
-              onQRCodeDetected={handleQRDetected}
+              onQRCodeDetected={onQRDetected}
               currentArtworkId={currentArtworkId}
             />
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center">
+          <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(201,168,76,0.08)', textAlign: 'center' }}>
+            <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '12px', fontWeight: 300, color: 'rgba(242,232,213,0.3)', letterSpacing: '0.04em' }}>
               Point your camera at the QR code next to the artwork
             </p>
           </div>

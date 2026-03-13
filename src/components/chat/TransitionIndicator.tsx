@@ -8,55 +8,42 @@ interface TransitionIndicatorProps {
   nextArtworkTitle?: string
 }
 
-export function TransitionIndicator({ 
-  current, 
-  next, 
+export function TransitionIndicator({
+  current,
+  next,
   isTransitioning,
   currentArtworkTitle,
-  nextArtworkTitle 
+  nextArtworkTitle
 }: TransitionIndicatorProps) {
-  if (!current && !next) {
-    return null
-  }
+  if (!current && !next) return null
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm font-medium text-blue-900">
-                Now Viewing
-              </span>
-            </div>
-            <span className="text-sm text-blue-700">
-              {currentArtworkTitle || current || 'No artwork selected'}
-            </span>
-          </div>
-          
-          {next && (
-            <div className="flex items-center space-x-2 mt-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-orange-400 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-orange-900">
-                  Up Next
-                </span>
-              </div>
-              <span className="text-sm text-orange-700">
-                {nextArtworkTitle || next}
-              </span>
-            </div>
-          )}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: next ? '6px' : 0 }}>
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em', color: 'rgba(201,168,76,0.5)' }}>NOW</span>
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '13px', fontStyle: 'italic', color: 'rgba(242,232,213,0.7)' }}>
+            {currentArtworkTitle || current || 'No artwork selected'}
+          </span>
         </div>
 
-        {isTransitioning && (
-          <div className="flex items-center space-x-2 text-blue-600">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-xs font-medium">Transitioning...</span>
+        {next && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em', color: 'rgba(201,168,76,0.4)' }}>NEXT</span>
+            <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '13px', fontStyle: 'italic', color: 'rgba(242,232,213,0.45)' }}>
+              {nextArtworkTitle || next}
+            </span>
           </div>
         )}
       </div>
+
+      {isTransitioning && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(201,168,76,0.6)' }}>
+          <div style={{ width: '14px', height: '14px', border: '1px solid rgba(201,168,76,0.3)', borderTopColor: '#C9A84C', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <span style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em' }}>TRANSITIONING</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Message {
   id: string
@@ -28,57 +26,54 @@ export function MessageBubble({ message, showSources }: MessageBubbleProps) {
   const isSpeculative = message.metadata?.isSpeculative
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[80%] ${isUser ? 'ml-12' : 'mr-12'}`}>
-        <Card
-          className={`p-3 ${
-            isUser
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-900'
-          }`}
-        >
+    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+      <div style={{ maxWidth: '80%', marginLeft: isUser ? '48px' : 0, marginRight: isUser ? 0 : '48px' }}>
+        <div style={{
+          padding: '10px 14px',
+          background: isUser ? 'rgba(201,168,76,0.15)' : 'rgba(242,232,213,0.04)',
+          border: `1px solid ${isUser ? 'rgba(201,168,76,0.3)' : 'rgba(242,232,213,0.08)'}`,
+        }}>
           {/* Speculative warning */}
           {isSpeculative && !isUser && (
-            <div className="flex items-center space-x-1 text-orange-600 text-xs mb-2">
-              <AlertTriangle className="w-3 h-3" />
-              <span>⚠️ Speculative</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'rgba(201,168,76,0.6)', fontSize: '10px', marginBottom: '6px', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em' }}>
+              ⚠ SPECULATIVE
             </div>
           )}
 
           {/* Message content */}
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          <div style={{
+            fontFamily: "'Raleway', sans-serif",
+            fontSize: '13px',
+            fontWeight: 300,
+            lineHeight: 1.7,
+            color: isUser ? 'rgba(201,168,76,0.9)' : 'rgba(242,232,213,0.75)',
+            whiteSpace: 'pre-wrap',
+            letterSpacing: '0.02em',
+          }}>{message.content}</div>
 
           {/* Sources toggle */}
           {!isUser && message.metadata?.sources && showSources && (
-            <div className="mt-3 pt-2 border-t border-gray-200">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(201,168,76,0.1)' }}>
+              <button
                 onClick={() => setShowSourceDetails(!showSourceDetails)}
-                className="text-xs p-0 h-auto font-normal text-gray-600 hover:text-gray-800"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em', color: 'rgba(201,168,76,0.5)' }}
               >
-                <span className="flex items-center space-x-1">
-                  <span>Sources</span>
-                  {showSourceDetails ? (
-                    <ChevronUp className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
-                </span>
-              </Button>
+                SOURCES
+                {showSourceDetails ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
 
               {showSourceDetails && (
-                <div className="mt-2 text-xs text-gray-600">
-                  <div className="bg-gray-50 rounded p-2">
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'rgba(242,232,213,0.4)', fontFamily: "'Raleway', sans-serif" }}>
+                  <div style={{ background: 'rgba(201,168,76,0.05)', padding: '8px', border: '1px solid rgba(201,168,76,0.1)' }}>
                     {message.metadata.grounding ? (
                       <div>
-                        <p className="font-medium mb-1">Grounding Information:</p>
-                        <p className="text-gray-700">{message.metadata.grounding}</p>
+                        <p style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em', color: 'rgba(201,168,76,0.5)', marginBottom: '4px' }}>GROUNDING</p>
+                        <p>{message.metadata.grounding}</p>
                       </div>
                     ) : (
                       <div>
-                        <p className="font-medium mb-1">Sources:</p>
-                        <ul className="list-disc list-inside space-y-1">
+                        <p style={{ fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em', color: 'rgba(201,168,76,0.5)', marginBottom: '4px' }}>SOURCES</p>
+                        <ul style={{ paddingLeft: '14px', margin: 0 }}>
                           {message.metadata.sources.map((source, index) => (
                             <li key={index}>{source}</li>
                           ))}
@@ -90,17 +85,13 @@ export function MessageBubble({ message, showSources }: MessageBubbleProps) {
               )}
             </div>
           )}
-        </Card>
+        </div>
 
         {/* Timestamp */}
-        <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-          {message.timestamp.toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })}
+        <div style={{ fontSize: '10px', color: 'rgba(242,232,213,0.2)', marginTop: '4px', textAlign: isUser ? 'right' : 'left', fontFamily: "'Cinzel', serif", letterSpacing: '0.1em' }}>
+          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>
   )
 }
-

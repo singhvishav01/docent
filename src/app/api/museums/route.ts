@@ -4,8 +4,6 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    console.log('Museums API: Loading from database...');
-    
     const museums = await db.museum.findMany({
       where: {
         isActive: true
@@ -25,8 +23,6 @@ export async function GET() {
         }
       }
     });
-    
-    console.log(`Museums API: Found ${museums.length} museums`);
     
     // Format response to match the expected Museum type
     const formattedMuseums = museums.map(museum => ({

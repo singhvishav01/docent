@@ -17,8 +17,6 @@ export async function GET(
       );
     }
 
-    console.log(`Loading artworks for museum: ${museumId}`);
-
     // Load artworks from database
     const artworks = await db.artwork.findMany({
       where: {
@@ -57,8 +55,6 @@ export async function GET(
         };
       })
     );
-
-    console.log(`Found ${artworksWithCounts.length} artworks for museum ${museumId}`);
 
     return NextResponse.json(artworksWithCounts);
 

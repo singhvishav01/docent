@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/db';
-import { createChatCompletion, ChatContext } from '../../../lib/openai';
+import { createChatCompletion, ChatContext } from '../../../lib/ai/openai';
 import { ChunkedArtwork } from '../../../lib/rag/embeddings';
 
 export async function POST(req: NextRequest) {
@@ -12,10 +12,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = cookies();
     const token = cookieStore.get('auth-token')?.value;
 
-    // FOR DEVELOPMENT: Skip auth if no token (remove this in production)
-    if (!token) {
-      console.warn('No auth token found - proceeding without auth (DEV MODE)');
-    } else {
+    if (token) {
       // Verify the token if present
       const payload = verifyToken(token);
       if (!payload) {
@@ -27,6 +24,7 @@ export async function POST(req: NextRequest) {
       message,
       artworkId,
       museumId,
+      visitorName = null,
       stream: useStream = false,
       conversationHistory = [],
     } = await req.json();
@@ -35,15 +33,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    console.log(`Chat request: artworkId=${artworkId}, museumId=${museumId}, message=${message.substring(0, 50)}...`);
-
     let artwork: any = null;
     let chunks: ChunkedArtwork[] = [];
 
-    // Load artwork from database
     if (artworkId && museumId) {
-      console.log(`Looking for artwork: ${artworkId} in museum: ${museumId}`);
-      
       artwork = await db.artwork.findFirst({
         where: {
           id: artworkId,
@@ -60,8 +53,6 @@ export async function POST(req: NextRequest) {
       });
 
       if (artwork) {
-        console.log(`Found artwork: ${artwork.title} by ${artwork.artist}`);
-        
         // Load curator notes for context
         const curatorNotes = await db.curatorNote.findMany({
           where: {
@@ -115,9 +106,6 @@ export async function POST(req: NextRequest) {
           });
         });
 
-        console.log(`Built ${chunks.length} context chunks (1 core + ${curatorNotes.length} curator notes)`);
-      } else {
-        console.log(`Artwork ${artworkId} not found in museum ${museumId}`);
       }
     }
 
@@ -148,7 +136,8 @@ export async function POST(req: NextRequest) {
       artworkId,
       museumId,
       chunks,
-      artwork: artworkData
+      artwork: artworkData,
+      visitorName: visitorName || undefined,
     };
 
     if (useStream) {

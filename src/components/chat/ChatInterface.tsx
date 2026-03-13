@@ -7,6 +7,8 @@ import { SourceToggle } from './SourceToggle';
 import { WinstonVoiceManager, VoiceMode } from '@/lib/voice/WinstonVoiceManager';
 import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
 import { VoiceTourButton } from '../voice/VoiceTourButton';
+import { generateGreeting } from '@/lib/ai/greeting-generator';
+import { useVisitor } from '@/contexts/VisitorContext';
 
 interface ChatMessage {
   id: string;
@@ -32,6 +34,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTitle, onArtworkTransition }: ChatInterfaceProps) {
+  const { visitorName } = useVisitor();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -84,7 +87,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
           
           const welcomeMessage: ChatMessage = {
             id: `welcome-${artworkId}-${Date.now()}`,
-            content: `Hello! I'm here to help you explore "${artwork.title}" by ${artwork.artist}${artwork.year ? ` (${artwork.year})` : ''}. What would you like to know about this artwork?`,
+            content: generateGreeting(visitorName, artwork.title, artwork.artist, artwork.year),
             isUser: false,
             role: 'assistant',
             timestamp: new Date(),
