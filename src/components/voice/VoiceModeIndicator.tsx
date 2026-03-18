@@ -2,7 +2,7 @@
 'use client';
 
 import { Mic, MicOff, Brain, Volume2 } from 'lucide-react';
-import { VoiceMode } from '@/lib/voice/WinstonVoiceManager';
+import { VoiceMode } from '@/lib/voice/DocentVoiceManager';
 
 interface VoiceModeIndicatorProps {
   mode: VoiceMode;

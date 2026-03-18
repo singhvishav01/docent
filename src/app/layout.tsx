@@ -6,7 +6,7 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// WINSTON design system fonts — loaded globally so landing page & modal work
+// DOCENT design system fonts — loaded globally so landing page & modal work
 
 export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },

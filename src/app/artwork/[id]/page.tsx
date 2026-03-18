@@ -176,7 +176,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Breadcrumbs */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', letterSpacing: '0.05em', color: 'rgba(242,232,213,0.35)' }}>
-            <a href="/" style={{ color: 'rgba(201,168,76,0.5)', textDecoration: 'none', fontFamily: "'Cinzel', serif", fontSize: '11px', letterSpacing: '0.3em' }}>WINSTON</a>
+            <a href="/" style={{ color: 'rgba(201,168,76,0.5)', textDecoration: 'none', fontFamily: "'Cinzel', serif", fontSize: '11px', letterSpacing: '0.3em' }}>DOCENT</a>
             <span>›</span>
             <span style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>{museumId}</span>
             <span>›</span>

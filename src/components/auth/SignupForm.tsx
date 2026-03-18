@@ -80,7 +80,7 @@ export function SignupForm() {
 
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.7)', marginBottom: '16px' }}>
-          ◆ &nbsp; JOIN WINSTON &nbsp; ◆
+          ◆ &nbsp; JOIN DOCENT &nbsp; ◆
         </p>
         <h1 style={{ fontFamily: S.cormorant, fontSize: '32px', fontWeight: 300, color: S.parchment, lineHeight: 1.1, marginBottom: '10px' }}>
           Begin your<br />

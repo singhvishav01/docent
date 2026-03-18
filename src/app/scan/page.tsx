@@ -39,7 +39,7 @@ export default function ScanPage() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <a href="/" style={{ display: 'inline-block', marginBottom: '32px', textDecoration: 'none' }}>
-            <span style={{ fontFamily: S.cinzel, fontSize: '12px', letterSpacing: '0.4em', color: S.agedGold, opacity: 0.7 }}>← WINSTON</span>
+            <span style={{ fontFamily: S.cinzel, fontSize: '12px', letterSpacing: '0.4em', color: S.agedGold, opacity: 0.7 }}>← DOCENT</span>
           </a>
           <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.6)', marginBottom: '16px' }}>
             ◆ &nbsp; SCAN ARTWORK &nbsp; ◆
@@ -49,7 +49,7 @@ export default function ScanPage() {
             <span style={{ fontStyle: 'italic', color: S.agedGold }}>Discover.</span>
           </h1>
           <p style={{ fontFamily: S.raleway, fontSize: '13px', fontWeight: 300, color: 'rgba(242,232,213,0.45)', letterSpacing: '0.04em', lineHeight: 1.7 }}>
-            Point your camera at the QR code next to an artwork. WINSTON will take it from there.
+            Point your camera at the QR code next to an artwork. DOCENT will take it from there.
           </p>
         </div>
 
@@ -90,7 +90,7 @@ export default function ScanPage() {
           </p>
           {[
             'QR codes contain the artwork ID',
-            'WINSTON automatically finds the museum',
+            'DOCENT automatically finds the museum',
             'No manual museum selection needed',
           ].map((tip, i) => (
             <div key={i} style={{ display: 'flex', gap: '12px', marginBottom: '10px', alignItems: 'flex-start' }}>

@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from './MessageBubble';
 import { SourceToggle } from './SourceToggle';
-import { WinstonVoiceManager, VoiceMode } from '@/lib/voice/WinstonVoiceManager';
+import { DocentVoiceManager, VoiceMode } from '@/lib/voice/DocentVoiceManager';
 import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
 import { VoiceTourButton } from '../voice/VoiceTourButton';
 import { generateGreeting } from '@/lib/ai/greeting-generator';
@@ -34,7 +34,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTitle, onArtworkTransition }: ChatInterfaceProps) {
-  const { visitorName } = useVisitor();
+  const { visitorName, docentName } = useVisitor();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +52,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
   // Use ref to avoid stale closure issues
   const isVoiceTourActiveRef = useRef(false);
   
-  const voiceManager = useRef<WinstonVoiceManager | null>(null);
+  const voiceManager = useRef<DocentVoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -66,7 +66,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
 
   // Check voice support on mount
   useEffect(() => {
-    setVoiceSupported(WinstonVoiceManager.isSupported());
+    setVoiceSupported(DocentVoiceManager.isSupported());
   }, []);
 
   // Load artwork when artworkId changes
@@ -85,22 +85,8 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
             setActualMuseumId(museumId);
           }
           
-          const welcomeMessage: ChatMessage = {
-            id: `welcome-${artworkId}-${Date.now()}`,
-            content: generateGreeting(visitorName, artwork.title, artwork.artist, artwork.year),
-            isUser: false,
-            role: 'assistant',
-            timestamp: new Date(),
-            artworkInfo: {
-              id: artwork.id,
-              title: artwork.title,
-              artist: artwork.artist,
-              year: artwork.year
-            }
-          };
-          
-          setMessages([welcomeMessage]);
-          
+          setMessages([]);
+
           // Notify voice manager of artwork change if active
           if (isVoiceTourActive && voiceManager.current) {
             voiceManager.current.onArtworkChange(artwork.id, artwork.title);
@@ -119,7 +105,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
   // Initialize voice manager
   useEffect(() => {
     if (!voiceManager.current && voiceSupported) {
-      voiceManager.current = new WinstonVoiceManager({
+      voiceManager.current = new DocentVoiceManager({
         silenceTimeout: 30000 // 30 seconds
       });
 

@@ -42,11 +42,11 @@ const ARTISTS = [
 ];
 
 const CHAT_MESSAGES = [
-  { role: 'winston', text: "You're standing before Van Gogh's Starry Night. Painted in 1889 — during his time at Saint-Paul-de-Mausole. What you see isn't chaos. It's grief, made beautiful." },
+  { role: 'docent', text: "You're standing before Van Gogh's Starry Night. Painted in 1889 — during his time at Saint-Paul-de-Mausole. What you see isn't chaos. It's grief, made beautiful." },
   { role: 'user', text: "Why does it feel so alive?" },
-  { role: 'winston', text: "The swirling strokes — Van Gogh called it 'the terrible passions of humanity.' He painted from memory, at night. The village below is imagined. The sky is everything he felt." },
+  { role: 'docent', text: "The swirling strokes — Van Gogh called it 'the terrible passions of humanity.' He painted from memory, at night. The village below is imagined. The sky is everything he felt." },
   { role: 'user', text: "What's that bright star on the right?" },
-  { role: 'winston', text: "Venus. Van Gogh was obsessed with the night sky. He once wrote to his brother Theo — 'I want to paint the starry sky.' This was his answer." },
+  { role: 'docent', text: "Venus. Van Gogh was obsessed with the night sky. He once wrote to his brother Theo — 'I want to paint the starry sky.' This was his answer." },
 ];
 
 const FEATURES = [
@@ -123,7 +123,7 @@ export default function HomePage() {
     const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
     for (const msg of CHAT_MESSAGES) {
-      if (msg.role === 'winston') {
+      if (msg.role === 'docent') {
         await delay(900);
         // Typing indicator
         setChatMessages(m => [...m, { role: 'typing', text: '' }]);
@@ -165,7 +165,7 @@ export default function HomePage() {
         {/* Nav */}
         <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '32px 48px' }}>
           <div>
-            <div style={{ fontFamily: S.cinzel, fontSize: '14px', letterSpacing: '0.4em', color: S.parchment }}>WINSTON</div>
+            <div style={{ fontFamily: S.cinzel, fontSize: '14px', letterSpacing: '0.4em', color: S.parchment }}>DOCENT</div>
             <div style={{ fontFamily: S.cinzel, fontSize: '9px', letterSpacing: '0.6em', color: S.agedGold, opacity: 0.7, marginTop: '2px' }}>MUSEUM DOCENT</div>
           </div>
           <div style={{ fontFamily: S.raleway, fontSize: '11px', letterSpacing: '0.2em', color: 'rgba(242,232,213,0.4)' }}>EST. 2025</div>
@@ -214,7 +214,7 @@ export default function HomePage() {
             <span style={{ fontStyle: 'italic', color: S.agedGold }}>Speaks.</span>
           </h1>
           <p style={{ fontFamily: S.cormorant, fontSize: 'clamp(16px, 2.5vw, 22px)', fontWeight: 300, fontStyle: 'italic', color: 'rgba(242,232,213,0.6)', margin: '20px 0 48px', letterSpacing: '0.05em' }}>
-            WINSTON remembers what moves you.
+            DOCENT remembers what moves you.
           </p>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <PrimaryButton onClick={handleBeginJourney}>BEGIN YOUR JOURNEY</PrimaryButton>
@@ -262,7 +262,7 @@ export default function HomePage() {
         }}>
           <div style={{
             display: 'flex', whiteSpace: 'nowrap',
-            animation: 'winstonScroll 30s linear infinite',
+            animation: 'docentScroll 30s linear infinite',
           }}>
             {[...ARTISTS, ...ARTISTS].map((a, i) => (
               i % 1 === 0 ? (
@@ -291,13 +291,13 @@ export default function HomePage() {
 
           {/* Left: copy */}
           <div>
-            <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.5)', marginBottom: '16px' }}>◆ &nbsp; EXPERIENCE WINSTON &nbsp; ◆</p>
+            <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.5)', marginBottom: '16px' }}>◆ &nbsp; EXPERIENCE DOCENT &nbsp; ◆</p>
             <h2 style={{ fontFamily: S.cormorant, fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: 300, color: S.parchment, lineHeight: 1.1, marginBottom: '24px' }}>
               This is what<br />
               <span style={{ fontStyle: 'italic', color: S.agedGold }}>awaits you.</span>
             </h2>
             <p style={{ fontFamily: S.raleway, fontSize: '14px', fontWeight: 300, color: 'rgba(242,232,213,0.5)', lineHeight: 1.9, letterSpacing: '0.04em', marginBottom: '40px' }}>
-              Stand before a masterpiece. WINSTON speaks. Ask anything — history, technique, hidden meaning. Every visit remembered. Every question answered.
+              Stand before a masterpiece. DOCENT speaks. Ask anything — history, technique, hidden meaning. Every visit remembered. Every question answered.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {FEATURES.map(f => (
@@ -338,7 +338,7 @@ export default function HomePage() {
                   {chatMessages.map((msg, i) => (
                     msg.role === 'typing' ? (
                       <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
-                        <p style={{ fontFamily: S.cinzel, fontSize: '7px', letterSpacing: '0.3em', color: 'rgba(201,168,76,0.5)', marginBottom: '4px' }}>WINSTON</p>
+                        <p style={{ fontFamily: S.cinzel, fontSize: '7px', letterSpacing: '0.3em', color: 'rgba(201,168,76,0.5)', marginBottom: '4px' }}>DOCENT</p>
                         <div style={{ background: 'rgba(61,43,31,0.4)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '0 12px 12px 12px', padding: '10px 14px', display: 'flex', gap: '4px' }}>
                           {[0, 1, 2].map(d => (
                             <div key={d} style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(201,168,76,0.5)', animation: `typingBounce 1s ${d * 0.2}s infinite` }} />
@@ -346,20 +346,20 @@ export default function HomePage() {
                         </div>
                       </div>
                     ) : (
-                      <div key={i} style={{ alignSelf: msg.role === 'winston' ? 'flex-start' : 'flex-end', maxWidth: '85%' }}>
-                        <p style={{ fontFamily: S.cinzel, fontSize: '7px', letterSpacing: '0.3em', color: msg.role === 'winston' ? 'rgba(201,168,76,0.5)' : 'rgba(166,123,107,0.5)', marginBottom: '4px', textAlign: msg.role === 'user' ? 'right' : 'left' }}>
-                          {msg.role === 'winston' ? 'WINSTON' : 'YOU'}
+                      <div key={i} style={{ alignSelf: msg.role === 'docent' ? 'flex-start' : 'flex-end', maxWidth: '85%' }}>
+                        <p style={{ fontFamily: S.cinzel, fontSize: '7px', letterSpacing: '0.3em', color: msg.role === 'docent' ? 'rgba(201,168,76,0.5)' : 'rgba(166,123,107,0.5)', marginBottom: '4px', textAlign: msg.role === 'user' ? 'right' : 'left' }}>
+                          {msg.role === 'docent' ? 'DOCENT' : 'YOU'}
                         </p>
                         <div style={{
                           padding: '10px 14px',
-                          background: msg.role === 'winston' ? 'rgba(61,43,31,0.4)' : 'rgba(92,26,26,0.3)',
-                          border: `1px solid ${msg.role === 'winston' ? 'rgba(201,168,76,0.15)' : 'rgba(166,123,107,0.2)'}`,
-                          borderRadius: msg.role === 'winston' ? '0 12px 12px 12px' : '12px 0 12px 12px',
+                          background: msg.role === 'docent' ? 'rgba(61,43,31,0.4)' : 'rgba(92,26,26,0.3)',
+                          border: `1px solid ${msg.role === 'docent' ? 'rgba(201,168,76,0.15)' : 'rgba(166,123,107,0.2)'}`,
+                          borderRadius: msg.role === 'docent' ? '0 12px 12px 12px' : '12px 0 12px 12px',
                           fontFamily: S.raleway,
                           fontSize: '11px',
                           lineHeight: 1.6,
                           fontWeight: 300,
-                          color: msg.role === 'winston' ? 'rgba(242,232,213,0.85)' : 'rgba(242,232,213,0.7)',
+                          color: msg.role === 'docent' ? 'rgba(242,232,213,0.85)' : 'rgba(242,232,213,0.7)',
                         }}>
                           {msg.text}
                         </div>
@@ -371,7 +371,7 @@ export default function HomePage() {
                 {/* Mic bar */}
                 <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(201,168,76,0.1)', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(13,10,7,0.8)' }}>
                   <div style={{ width: '32px', height: '32px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>🎙</div>
-                  <p style={{ fontFamily: S.raleway, fontSize: '10px', color: 'rgba(242,232,213,0.2)', letterSpacing: '0.1em', fontStyle: 'italic' }}>Speak to WINSTON...</p>
+                  <p style={{ fontFamily: S.raleway, fontSize: '10px', color: 'rgba(242,232,213,0.2)', letterSpacing: '0.1em', fontStyle: 'italic' }}>Speak to DOCENT...</p>
                 </div>
               </div>
             </div>
@@ -386,9 +386,9 @@ export default function HomePage() {
       <section style={{ background: 'linear-gradient(180deg, #0f0c09 0%, #150f0a 100%)', padding: '100px 48px', textAlign: 'center' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ width: '80px', height: '1px', background: S.agedGold, margin: '0 auto 32px', opacity: 0.4 }} />
-          <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.6)', marginBottom: '24px' }}>◆ &nbsp; JOIN WINSTON &nbsp; ◆</p>
+          <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.6)', marginBottom: '24px' }}>◆ &nbsp; JOIN DOCENT &nbsp; ◆</p>
           <h2 style={{ fontFamily: S.cormorant, fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: 300, color: S.parchment, lineHeight: 1.1, marginBottom: '20px' }}>
-            WINSTON remembers<br />
+            DOCENT remembers<br />
             <span style={{ fontStyle: 'italic', color: S.agedGold }}>his visitors.</span>
           </h2>
           <p style={{ fontFamily: S.raleway, fontSize: '13px', fontWeight: 300, color: 'rgba(242,232,213,0.45)', lineHeight: 1.9, letterSpacing: '0.04em', marginBottom: '40px' }}>
@@ -423,7 +423,7 @@ export default function HomePage() {
 
       {/* Keyframe animations injected via style tag */}
       <style>{`
-        @keyframes winstonScroll {
+        @keyframes docentScroll {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }

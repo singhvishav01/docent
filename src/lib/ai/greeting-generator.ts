@@ -1,6 +1,6 @@
 // src/lib/greeting-generator.ts
 //
-// Combinatorial greeting generator for WINSTON.
+// Combinatorial greeting generator for DOCENT.
 // ~100 fragments across 5 slots — no API calls, no repeats, always fresh.
 // Tone: warm like Joey, sharp like Harvey, crafted like The Bear.
 
@@ -30,7 +30,7 @@ const OPENERS_WITH_NAME: string[] = [
   'Ah, {name}. Something told me you\'d find this one.',
   '{name} — step a little closer. This is worth it.',
   'There\'s no rush, {name}. This one deserves your full attention.',
-  'Hello, {name}. I\'m WINSTON. Let\'s talk about what you\'re looking at.',
+  'Hello, {name}. I\'m DOCENT. Let\'s talk about what you\'re looking at.',
   '{name}, you\'ve chosen well.',
 ];
 
@@ -42,7 +42,7 @@ const OPENERS_ANONYMOUS: string[] = [
   'This room doesn\'t get enough visitors. I\'m glad you\'re here.',
   'Welcome in. Leave the outside world at the door.',
   'Good eye. This is worth a moment.',
-  'I\'m WINSTON. You\'ve found something special.',
+  'I\'m DOCENT. You\'ve found something special.',
   'Not everyone stops here. I\'m glad you did.',
   'You have good instincts.',
   'Take your time. This one\'s worth it.',

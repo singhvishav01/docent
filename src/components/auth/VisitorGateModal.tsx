@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVisitor } from '@/contexts/VisitorContext';
+import { NameYourDocent } from '@/components/onboarding/NameYourDocent';
 
 // ─── Minimal Zustand-like store (no extra dependency) ─────────────────────────
 type Resolver = () => void;
@@ -56,15 +57,16 @@ export function useVisitorGateStore<T>(selector: (s: GateStore) => T): T {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-type Step = 'choice' | 'name';
+type Step = 'choice' | 'name' | 'docent-name';
 
 export function VisitorGateModal() {
-  const { setVisitorIdentity } = useVisitor();
+  const { setVisitorIdentity, setDocentName } = useVisitor();
   const router = useRouter();
   const isOpen = useVisitorGateStore(s => s.isOpen);
 
   const [step, setStep] = useState<Step>('choice');
   const [name, setName] = useState('');
+  const [pendingVisitorName, setPendingVisitorName] = useState<string>('');
   const [animateIn, setAnimateIn] = useState(false);
   const [stepTransition, setStepTransition] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +107,16 @@ export function VisitorGateModal() {
   const handleNameSubmit = (submittedName?: string) => {
     const finalName = (submittedName ?? name).trim() || 'Guest';
     setVisitorIdentity(finalName, 'guest');
+    setPendingVisitorName(finalName);
+    setStepTransition(true);
+    setTimeout(() => {
+      setStep('docent-name');
+      setStepTransition(false);
+    }, 250);
+  };
+
+  const handleDocentNameSelect = (chosenName: string) => {
+    setDocentName(chosenName);
     _state.resolve();
   };
 
@@ -161,6 +173,12 @@ export function VisitorGateModal() {
               inputRef={inputRef}
             />
           ) : null}
+          {step === 'docent-name' ? (
+            <NameYourDocent
+              visitorName={pendingVisitorName || null}
+              onSelect={handleDocentNameSelect}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -194,7 +212,7 @@ function ChoiceStep({ onSignIn, onGuest }: { onSignIn: () => void; onGuest: () =
         marginBottom: '20px',
         textAlign: 'center',
       }}>
-        WINSTON remembers<br />
+        DOCENT remembers<br />
         <span style={{ fontStyle: 'italic', color: '#C9A84C' }}>his visitors.</span>
       </h2>
 
@@ -309,7 +327,7 @@ function NameStep({
         marginBottom: '12px',
         textAlign: 'center',
       }}>
-        What shall WINSTON<br />
+        What shall DOCENT<br />
         <span style={{ fontStyle: 'italic', color: '#C9A84C' }}>call you?</span>
       </h2>
 

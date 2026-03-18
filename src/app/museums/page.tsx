@@ -118,7 +118,7 @@ export default function MuseumsPage() {
         {/* Nav */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '64px' }}>
           <a href="/" style={{ textDecoration: 'none' }}>
-            <div style={{ ...sty.cinzel, fontSize: '13px', letterSpacing: '0.4em', color: '#F2E8D5' }}>WINSTON</div>
+            <div style={{ ...sty.cinzel, fontSize: '13px', letterSpacing: '0.4em', color: '#F2E8D5' }}>DOCENT</div>
             <div style={{ ...sty.cinzel, fontSize: '8px', letterSpacing: '0.6em', color: 'rgba(201,168,76,0.6)', marginTop: '2px' }}>MUSEUM DOCENT</div>
           </a>
           <Link href="/scan" style={{ textDecoration: 'none', fontFamily: "'Cinzel', serif", fontSize: '10px', letterSpacing: '0.3em', color: '#0D0A07', background: '#C9A84C', padding: '12px 28px', display: 'inline-block' }}>

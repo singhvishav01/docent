@@ -25,8 +25,10 @@ export async function POST(req: NextRequest) {
       artworkId,
       museumId,
       visitorName = null,
+      docentName = null,
       stream: useStream = false,
       conversationHistory = [],
+      voice = false,
     } = await req.json();
 
     if (!message) {
@@ -138,17 +140,18 @@ export async function POST(req: NextRequest) {
       chunks,
       artwork: artworkData,
       visitorName: visitorName || undefined,
+      docentName: docentName || undefined,
     };
 
     if (useStream) {
       // Streaming path — pipes raw text deltas directly to the client
       const streamResult = await createChatCompletion(context, {
         model: 'gpt-4o-mini',
-        maxTokens: 500,   // Voice answers should be concise
+        maxTokens: 500,
         groundingTokenLimit: 1000,
         historyTokenLimit: 1500,
         stream: true,
-        voice: true,
+        voice: voice,
       }) as ReadableStream;
 
       return new Response(streamResult, {
@@ -166,6 +169,7 @@ export async function POST(req: NextRequest) {
       groundingTokenLimit: 1000,
       historyTokenLimit: 1500,
       stream: false,
+      voice: voice,
     });
 
     return NextResponse.json({

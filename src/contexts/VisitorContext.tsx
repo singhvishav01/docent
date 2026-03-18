@@ -8,8 +8,10 @@ interface VisitorContextValue {
   visitorName: string | null;
   visitorType: VisitorType;
   isIdentified: boolean;
+  docentName: string | null;
   setVisitorIdentity: (name: string, type: 'guest' | 'registered') => void;
   clearVisitorIdentity: () => void;
+  setDocentName: (name: string) => void;
 }
 
 const VisitorContext = createContext<VisitorContextValue | null>(null);
@@ -17,11 +19,13 @@ const VisitorContext = createContext<VisitorContextValue | null>(null);
 const STORAGE_KEYS = {
   name: 'docent_visitor_name',
   type: 'docent_visitor_type',
+  docentName: 'docent-chosen-name',
 } as const;
 
 export function VisitorProvider({ children }: { children: React.ReactNode }) {
   const [visitorName, setVisitorName] = useState<string | null>(null);
   const [visitorType, setVisitorType] = useState<VisitorType>(null);
+  const [docentName, setDocentNameState] = useState<string | null>(null);
 
   // Rehydrate identity on mount:
   // 1. Check localStorage (guest or returning registered visitor)
@@ -31,10 +35,14 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedName = localStorage.getItem(STORAGE_KEYS.name);
       const savedType = localStorage.getItem(STORAGE_KEYS.type) as VisitorType;
+      const savedDocentName = localStorage.getItem(STORAGE_KEYS.docentName);
       if (savedName && (savedType === 'guest' || savedType === 'registered')) {
         setVisitorName(savedName);
         setVisitorType(savedType);
         identified = true;
+      }
+      if (savedDocentName) {
+        setDocentNameState(savedDocentName);
       }
     } catch {
       // localStorage unavailable
@@ -67,12 +75,23 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setDocentName = (name: string) => {
+    setDocentNameState(name);
+    try {
+      localStorage.setItem(STORAGE_KEYS.docentName, name);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
   const clearVisitorIdentity = () => {
     setVisitorName(null);
     setVisitorType(null);
+    setDocentNameState(null);
     try {
       localStorage.removeItem(STORAGE_KEYS.name);
       localStorage.removeItem(STORAGE_KEYS.type);
+      localStorage.removeItem(STORAGE_KEYS.docentName);
     } catch {
       // Ignore storage errors
     }
@@ -84,8 +103,10 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
         visitorName,
         visitorType,
         isIdentified: visitorName !== null,
+        docentName,
         setVisitorIdentity,
         clearVisitorIdentity,
+        setDocentName,
       }}
     >
       {children}

@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageBubble } from './MessageBubble';
 import { SourceToggle } from './SourceToggle';
-import { WinstonVoiceManager, VoiceMode } from '@/lib/voice/WinstonVoiceManager';
+import { DocentVoiceManager, VoiceMode } from '@/lib/voice/DocentVoiceManager';
 import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
 import { VoiceTourButton } from '../voice/VoiceTourButton';
 import { useSession } from '@/contexts/SessionProvider';
@@ -44,7 +44,7 @@ export function PersistentChatInterface({
   artworkYear
 }: PersistentChatInterfaceProps) {
   const session = useSession();
-  const { visitorName } = useVisitor();
+  const { visitorName, docentName } = useVisitor();
   const { activeArtwork: contextArtwork } = useArtwork();
 
   const [inputMessage, setInputMessage] = useState('');
@@ -66,7 +66,7 @@ export function PersistentChatInterface({
   const lastArtworkIdRef = useRef<string>(artworkId);
   const isTransitioningRef = useRef(false);
 
-  const voiceManager = useRef<WinstonVoiceManager | null>(null);
+  const voiceManager = useRef<DocentVoiceManager | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const handleVoiceInputRef = useRef<(text: string) => Promise<void>>(async () => {});
@@ -80,7 +80,7 @@ export function PersistentChatInterface({
   }, [session.messages]);
 
   useEffect(() => {
-    setVoiceSupported(WinstonVoiceManager.isSupported());
+    setVoiceSupported(DocentVoiceManager.isSupported());
   }, []);
 
   useEffect(() => {
@@ -183,7 +183,7 @@ export function PersistentChatInterface({
 
   useEffect(() => {
     if (!voiceManager.current && voiceSupported) {
-      voiceManager.current = new WinstonVoiceManager({ silenceTimeout: 30000 });
+      voiceManager.current = new DocentVoiceManager({ silenceTimeout: 30000 });
 
       voiceManager.current.onModeChanged((mode) => {
         setVoiceMode(mode);
@@ -296,8 +296,10 @@ export function PersistentChatInterface({
           artworkTitle: currentArtwork?.title,
           artworkArtist: currentArtwork?.artist,
           visitorName: visitorName || null,
+          docentName: docentName || null,
           stream: useStreaming,
           conversationHistory,
+          voice: session.isVoiceTourActive,
         }),
       });
 

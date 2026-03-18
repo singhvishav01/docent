@@ -86,7 +86,7 @@ export function LoginForm() {
         </p>
         <h1 style={{ fontFamily: S.cormorant, fontSize: '32px', fontWeight: 300, color: S.parchment, lineHeight: 1.1, marginBottom: '10px' }}>
           Sign in to<br />
-          <span style={{ fontStyle: 'italic', color: S.agedGold }}>WINSTON</span>
+          <span style={{ fontStyle: 'italic', color: S.agedGold }}>DOCENT</span>
         </h1>
         <div style={{ width: '48px', height: '1px', background: 'rgba(201,168,76,0.3)', margin: '16px auto 0' }} />
       </div>
