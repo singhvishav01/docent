@@ -2,6 +2,13 @@ import OpenAI from 'openai';
 import { ChunkedArtwork } from '../rag/embeddings';
 import { ArtworkData } from '../rag/types';
 import { DOCENT_PERSONA, DOCENT_VOICE_PERSONA } from './docent-persona';
+import { VisitorProfile } from '../acquaintance/profile';
+import { buildAcquaintanceLayer } from '../acquaintance/prompt-layer';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+  baseURL: 'https://api.openai.com/v1',
+});
 
 export interface ChatContext {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -12,6 +19,7 @@ export interface ChatContext {
   artwork?: ArtworkData | null;
   visitorName?: string;
   docentName?: string;
+  visitorProfile?: VisitorProfile;
 }
 
 export interface CompactGroundingContext {
@@ -98,7 +106,8 @@ export function buildSystemPrompt(
   artwork?: ArtworkData | null,
   voice = false,
   visitorName?: string,
-  docentName?: string
+  docentName?: string,
+  visitorProfile?: VisitorProfile
 ): string {
   const persona = voice ? DOCENT_VOICE_PERSONA : DOCENT_PERSONA;
 
@@ -109,6 +118,8 @@ export function buildSystemPrompt(
   const docentNameLine = docentName
     ? `\nIDENTITY: Your name is ${docentName}. If the visitor asks your name, confirm it naturally and warmly. Do not volunteer your name unless asked.`
     : '';
+
+  const acquaintanceLayer = visitorProfile ? buildAcquaintanceLayer(visitorProfile) : '';
 
   let artworkContext = '';
   if (artwork) {
@@ -123,12 +134,27 @@ Museum: ${artwork.museum_name || artwork.museum}`;
     ? `\nKNOWLEDGE BASE (use as your primary source — do not stray beyond it):\n${context.relevantChunks.join('\n\n')}`
     : '';
 
-  return `${persona}${visitorLine}${docentNameLine}
+  return `${persona}${visitorLine}${docentNameLine}${acquaintanceLayer}
 ${artworkContext}
 ${groundingSection}
 
 If the visitor asks about an artwork you have no information on, say so naturally
-and redirect to what you do know. Never invent facts.`;
+and redirect to what you do know. Never invent facts.
+
+OFF-TOPIC RULE — this is non-negotiable:
+You are a museum guide. You only discuss art, this artwork, this museum, cultural history,
+and topics that connect meaningfully to what the visitor is looking at.
+If the visitor asks something completely unrelated to art or the current artwork
+(e.g. "what's the weather", "who won the game", "tell me a joke", "what should I eat"),
+do NOT answer it. Instead, call it out naturally and pull them back. Examples:
+  Visitor: "What's the score of the game tonight?"
+  Docent: "Ha — I'm the wrong person for that. But look at what's in front of you..."
+  Visitor: "Tell me a joke."
+  Docent: "I've got one painting that IS a joke, honestly. Want to hear about it?"
+  Visitor: "What should I have for dinner?"
+  Docent: "No idea, but I can tell you what this artist ate for breakfast — metaphorically speaking."
+Keep the redirect short, warm, and immediately pivoting back to the artwork.
+Never leave the visitor hanging on an off-topic question with a vague non-answer.`;
 }
 
 // Modified to support both streaming and non-streaming responses
@@ -154,10 +180,6 @@ export async function createChatCompletion(
     voice = false,
   } = options;
 
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY!
-  });
-
   try {
     // Build compact grounding context
     const groundingContext = context.chunks 
@@ -168,7 +190,7 @@ export async function createChatCompletion(
     const trimmedHistory = trimChatHistory(context.messages, historyTokenLimit);
 
     // Build system prompt with artwork context — voice mode uses shorter, spoken-rhythm prompt
-    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice, context.visitorName, context.docentName);
+    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice, context.visitorName, context.docentName, context.visitorProfile);
 
     if (stream) {
       // Streaming response

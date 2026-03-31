@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVisitor } from '@/contexts/VisitorContext';
 import { NameYourDocent } from '@/components/onboarding/NameYourDocent';
+import AcquaintanceIntro from '@/components/onboarding/AcquaintanceIntro';
+import { VisitorProfile } from '@/lib/acquaintance/profile';
 
 // ─── Minimal Zustand-like store (no extra dependency) ─────────────────────────
 type Resolver = () => void;
@@ -57,30 +59,52 @@ export function useVisitorGateStore<T>(selector: (s: GateStore) => T): T {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-type Step = 'choice' | 'name' | 'docent-name';
+type Step = 'choice' | 'name' | 'docent-name' | 'acquaintance';
 
 export function VisitorGateModal() {
-  const { setVisitorIdentity, setDocentName } = useVisitor();
+  const { setVisitorIdentity, setDocentName, setVisitorProfile, visitorName, docentName, visitorProfile, isProfileLoading } = useVisitor();
   const router = useRouter();
   const isOpen = useVisitorGateStore(s => s.isOpen);
+
+  // Auto-resolve: gate opened while DB was still loading, but profile came back
+  // with intro_complete === true → close without showing anything
+  useEffect(() => {
+    if (isOpen && !isProfileLoading && visitorProfile?.intro_complete === true) {
+      _state.resolve();
+    }
+  }, [isOpen, isProfileLoading, visitorProfile]);
 
   const [step, setStep] = useState<Step>('choice');
   const [name, setName] = useState('');
   const [pendingVisitorName, setPendingVisitorName] = useState<string>('');
+  const [pendingDocentName, setPendingDocentName] = useState<string | null>(null);
   const [animateIn, setAnimateIn] = useState(false);
   const [stepTransition, setStepTransition] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Animate in when modal opens
+  // When the modal opens, pick the right starting step
   useEffect(() => {
-    if (isOpen) {
-      setStep('choice');
-      setName('');
-      setTimeout(() => setAnimateIn(true), 10);
-    } else {
-      setAnimateIn(false);
-    }
+    if (!isOpen) { setAnimateIn(false); return; }
+    setName('');
+    setTimeout(() => setAnimateIn(true), 10);
+    // Step is resolved once loading is done — see effect below
   }, [isOpen]);
+
+  // Re-evaluate step whenever loading state or identity changes while modal is open
+  useEffect(() => {
+    if (!isOpen || isProfileLoading) return;
+    // Already done — auto-resolve handles it
+    if (visitorProfile?.intro_complete === true) return;
+    // Registered / named user who hasn't done intro: skip straight to acquaintance
+    if (visitorName) {
+      setPendingVisitorName(visitorName);
+      setPendingDocentName(docentName);
+      setStep(docentName ? 'acquaintance' : 'docent-name');
+    } else {
+      setStep('choice');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isProfileLoading, visitorName]);
 
   // Focus input when step 2 renders
   useEffect(() => {
@@ -89,7 +113,15 @@ export function VisitorGateModal() {
     }
   }, [step]);
 
+  // While DB is loading, show nothing (auto-resolve effect handles it if intro is done)
   if (!isOpen) return null;
+  if (isProfileLoading) return (
+    <div className="fixed inset-0 z-[9000] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.82)' }}>
+      <p style={{ fontFamily: "'Cinzel', serif", fontSize: '11px', letterSpacing: '0.3em', color: 'rgba(201,168,76,0.5)' }}>
+        ···
+      </p>
+    </div>
+  );
 
   const handleSignIn = () => {
     _state.resolve();
@@ -117,12 +149,28 @@ export function VisitorGateModal() {
 
   const handleDocentNameSelect = (chosenName: string) => {
     setDocentName(chosenName);
+    setPendingDocentName(chosenName);
+    setStepTransition(true);
+    setTimeout(() => {
+      setStep('acquaintance');
+      setStepTransition(false);
+    }, 250);
+  };
+
+  const handleAcquaintanceComplete = (profile: VisitorProfile) => {
+    setVisitorProfile(profile);
     _state.resolve();
   };
 
   const handleAnonymous = () => {
+    // Don't skip the intro — set identity as Guest and continue to docent selection
     setVisitorIdentity('Guest', 'guest');
-    _state.resolve();
+    setPendingVisitorName('Guest');
+    setStepTransition(true);
+    setTimeout(() => {
+      setStep('docent-name');
+      setStepTransition(false);
+    }, 250);
   };
 
   return (
@@ -141,8 +189,8 @@ export function VisitorGateModal() {
           boxShadow: '0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.08)',
           borderRadius: '4px',
           width: '100%',
-          maxWidth: '440px',
-          padding: '48px 40px',
+          maxWidth: step === 'acquaintance' ? '480px' : '440px',
+          padding: step === 'acquaintance' ? '36px 32px 32px' : '48px 40px',
           opacity: animateIn ? 1 : 0,
           transform: animateIn ? 'translateY(0)' : 'translateY(24px)',
           transition: 'opacity 0.4s ease, transform 0.4s ease',
@@ -177,6 +225,13 @@ export function VisitorGateModal() {
             <NameYourDocent
               visitorName={pendingVisitorName || null}
               onSelect={handleDocentNameSelect}
+            />
+          ) : null}
+          {step === 'acquaintance' ? (
+            <AcquaintanceIntro
+              visitorName={pendingVisitorName || null}
+              docentName={pendingDocentName}
+              onComplete={handleAcquaintanceComplete}
             />
           ) : null}
         </div>

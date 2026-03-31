@@ -1007,6 +1007,12 @@ export class DocentVoiceManager {
   // Prevent the silence-offer from looping until the user actually speaks
   private silenceOffered = false;
 
+  // Sentences spoken in the current artwork session — reset on artwork change
+  private spokenSentenceCount = 0;
+
+  // Response generation counter — prevents stale sentences from a cancelled stream from playing
+  private responseGeneration = 0;
+
   constructor(config: VoiceConfig = {}) {
   this.silenceTimeout = config.silenceTimeout || 30000;
   
@@ -1077,16 +1083,19 @@ export class DocentVoiceManager {
 
     this.recognition.onerror = (event: any) => {
       console.error('[Voice] Recognition error:', event.error);
-      
-      if (event.error === 'no-speech') {
+
+      // 'no-speech' and 'aborted' are not real errors — onend will handle restart.
+      if (event.error === 'no-speech' || event.error === 'aborted') {
         return;
       }
-      
+
       if (this.onError) {
         this.onError(event.error);
       }
 
-      if (this.mode === 'listening' && event.error !== 'aborted') {
+      // For other errors, restart after a longer delay
+      if (this.mode === 'listening') {
+        this.mode = 'thinking'; // Reset so onend + startListening can proceed
         setTimeout(() => this.startListening(), 1000);
       }
     };
@@ -1094,8 +1103,11 @@ export class DocentVoiceManager {
     this.recognition.onend = () => {
       console.log('[Voice] Recognition ended');
       if (this.mode === 'listening') {
+        // Reset mode so startListening() won't bail with "Already listening".
+        // This handles the 'aborted' race where onerror fires but mode never changed.
+        this.mode = 'thinking';
         console.log('[Voice] Restarting...');
-        setTimeout(() => this.startListening(), 100);
+        setTimeout(() => this.startListening(), 150);
       }
       // Note: 'speaking' mode restart is handled inside speakWithInterruption
       // via its own overridden onend, so we don't restart here.
@@ -1240,41 +1252,53 @@ export class DocentVoiceManager {
     this.clearSilenceTimer();
   }
 
- async speak(text: string): Promise<void> {
-  console.log(`[Voice] Speaking via OpenAI TTS: "${text.substring(0, 50)}..."`);
-  this.stopSpeaking();
-  this.setMode('speaking');
-  return new Promise(async (resolve, reject) => {
-    try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) throw new Error(`TTS API error: ${response.status}`);
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+  async speak(text: string): Promise<void> {
+    console.log(`[Voice] Speaking via OpenAI TTS: "${text.substring(0, 50)}..."`);
+    this.stopSpeaking();
+    this.setMode('speaking');
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) throw new Error(`TTS API error: ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    return this.playAudioUrl(url);
+  }
+
+  /** Play a pre-fetched audio blob URL and wait for completion or interruption. */
+  private async playAudioUrl(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(url);
       this.currentAudio = audio;
+
+      // Poll for external stop (barge-in calls stopSpeaking() which nulls currentAudio).
+      const interruptPoll = setInterval(() => {
+        if (this.currentAudio !== audio) {
+          clearInterval(interruptPoll);
+          URL.revokeObjectURL(url);
+          resolve();
+        }
+      }, 50);
+
       audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
+        clearInterval(interruptPoll);
+        URL.revokeObjectURL(url);
         this.currentAudio = null;
         console.log('[Voice] TTS completed');
         resolve();
       };
       audio.onerror = (err) => {
-        URL.revokeObjectURL(audioUrl);
+        clearInterval(interruptPoll);
+        URL.revokeObjectURL(url);
         this.currentAudio = null;
         console.error('[Voice] Audio playback error:', err);
         reject(err);
       };
-      await audio.play();
-    } catch (error) {
-      console.error('[Voice] TTS fetch failed:', error);
-      reject(error);
-    }
-  });
-}
+      audio.play().catch(reject);
+    });
+  }
   async speakWithInterruption(text: string): Promise<'completed' | 'interrupted'> {
     console.log(`[Voice] 🔊🎧 With interruption: "${text.substring(0, 50)}..."`);
 
@@ -1298,7 +1322,9 @@ export class DocentVoiceManager {
           console.log(`[Voice] 🚨 INTERRUPTION: "${transcript}"`);
           wasInterrupted = true;
 
-          this.synthesis.cancel();
+          // stopSpeaking() pauses the HTMLAudioElement and nulls currentAudio.
+          // The 50ms poll inside speak() detects this and resolves the speak() promise.
+          this.stopSpeaking();
           this.setMode('thinking');
 
           if (this.onTranscript) {
@@ -1415,14 +1441,31 @@ export class DocentVoiceManager {
     }
   }
 
+  /**
+   * Call at the start of each new AI voice response.
+   * Clears stale sentences, resets queue state, and sets mode to speaking.
+   * Returns the generation token — pass it to enqueueSentence() calls for this response.
+   */
+  beginNewVoiceResponse(): number {
+    if (this.mode === 'dormant') return this.responseGeneration;
+    this.responseGeneration++;
+    this.sentenceQueue = [];
+    this.isProcessingQueue = false;
+    this.queueFinalized = false;
+    this.setMode('speaking');
+    return this.responseGeneration;
+  }
+
   // ── Sentence queue API ──────────────────────────────────────────────────────
 
   /**
    * Add one sentence to the TTS queue. Starts processing immediately if idle.
    * Call this for each sentence as it arrives from the streaming API response.
    */
-  enqueueSentence(text: string): void {
+  enqueueSentence(text: string, generation?: number): void {
     if (this.mode === 'dormant') return;
+    // Drop sentence if it belongs to a cancelled (older) response
+    if (generation !== undefined && generation !== this.responseGeneration) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     this.queueFinalized = false;
@@ -1456,14 +1499,16 @@ export class DocentVoiceManager {
    */
   waitForCurrentSentence(maxMs = 4000): Promise<void> {
     return new Promise(resolve => {
-      if (!this.synthesis.speaking) { resolve(); return; }
+      // Check HTMLAudioElement (OpenAI TTS) first, fall back to Web Speech synthesis
+      const isPlaying = () => !!(this.currentAudio) || this.synthesis.speaking;
+      if (!isPlaying()) { resolve(); return; }
       const deadline = setTimeout(() => {
         clearInterval(poll);
-        this.synthesis.cancel();
+        this.stopSpeaking();
         resolve();
       }, maxMs);
       const poll = setInterval(() => {
-        if (!this.synthesis.speaking) {
+        if (!isPlaying()) {
           clearInterval(poll);
           clearTimeout(deadline);
           resolve();
@@ -1472,21 +1517,79 @@ export class DocentVoiceManager {
     });
   }
 
+  /** Get count of sentences spoken in current artwork session. */
+  getSpokenSentenceCount(): number {
+    return this.spokenSentenceCount;
+  }
+
+  /** Reset sentence count — call on artwork change. */
+  resetSentenceCount(): void {
+    this.spokenSentenceCount = 0;
+  }
+
+  /** Whether TTS audio is currently playing or queued. */
+  isCurrentlyPlaying(): boolean {
+    return !!(this.currentAudio) || this.isProcessingQueue;
+  }
+
   private async runSentenceQueue(): Promise<void> {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
     this.setMode('speaking');
 
-    while (this.sentenceQueue.length > 0) {
-      if (this.mode === 'dormant' || this.mode === 'thinking') break;
-      const sentence = this.sentenceQueue.shift()!;
-      try {
-        await this.speak(sentence);
-      } catch {
-        this.sentenceQueue = [];
+    // Kick off a TTS fetch without blocking — returns a promise for the blob URL
+    const fetchTTS = (text: string): Promise<string> =>
+      fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }).then(r => {
+        if (!r.ok) throw new Error(`TTS ${r.status}`);
+        return r.blob();
+      }).then(b => URL.createObjectURL(b));
+
+    // Pre-fetch the next sentence's audio while the current one is playing,
+    // so there's no gap between sentences.
+    let nextAudioPromise: Promise<string> | null = null;
+
+    while (this.sentenceQueue.length > 0 || nextAudioPromise !== null) {
+      if (this.mode === 'dormant') {
+        if (nextAudioPromise) nextAudioPromise.then(u => URL.revokeObjectURL(u)).catch(() => {});
+        nextAudioPromise = null;
         break;
       }
-      // Short natural breath between sentences
+
+      const sentence = this.sentenceQueue.shift();
+
+      // Resolve which audio promise to use for this sentence
+      let currentAudioPromise: Promise<string>;
+      if (nextAudioPromise !== null) {
+        currentAudioPromise = nextAudioPromise;
+        nextAudioPromise = null;
+      } else if (sentence) {
+        currentAudioPromise = fetchTTS(sentence);
+      } else {
+        break;
+      }
+
+      // Pre-fetch the NEXT sentence in parallel while we wait for + play the current one
+      if (this.sentenceQueue.length > 0) {
+        nextAudioPromise = fetchTTS(this.sentenceQueue[0]);
+      }
+
+      try {
+        const url = await currentAudioPromise;
+        if (this.mode !== 'dormant') {
+          await this.playAudioUrl(url);
+          this.spokenSentenceCount++;
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      } catch (err) {
+        console.error('[Voice] TTS error in queue:', err);
+        // Don't abort whole queue on one failure — continue to next
+      }
+
       if (this.sentenceQueue.length > 0 && this.mode === 'speaking') {
         await new Promise(r => setTimeout(r, 80));
       }
@@ -1496,7 +1599,6 @@ export class DocentVoiceManager {
     if (this.queueFinalized && this.mode === 'speaking') {
       this.resumeListening();
     }
-    // If not finalized, more sentences may still arrive — stay in speaking mode
   }
 
   // ── End sentence queue ───────────────────────────────────────────────────────
@@ -1507,6 +1609,7 @@ export class DocentVoiceManager {
     this.sentenceQueue = [];
     this.isProcessingQueue = false;
     this.queueFinalized = false;
+    this.spokenSentenceCount = 0;
     this.clearSilenceTimer();
     this.setMode('dormant');
     this.currentArtwork = null;

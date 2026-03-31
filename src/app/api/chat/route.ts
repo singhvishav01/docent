@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       stream: useStream = false,
       conversationHistory = [],
       voice = false,
+      visitorProfile = null,
     } = await req.json();
 
     if (!message) {
@@ -39,24 +40,22 @@ export async function POST(req: NextRequest) {
     let chunks: ChunkedArtwork[] = [];
 
     if (artworkId && museumId) {
-      artwork = await db.artwork.findFirst({
-        where: {
-          id: artworkId,
-          museumId: museumId
-        },
-        include: {
-          museum: {
-            select: {
-              id: true,
-              name: true
+      const [artworkResult, curatorNotes] = await Promise.all([
+        db.artwork.findFirst({
+          where: {
+            id: artworkId,
+            museumId: museumId
+          },
+          include: {
+            museum: {
+              select: {
+                id: true,
+                name: true
+              }
             }
           }
-        }
-      });
-
-      if (artwork) {
-        // Load curator notes for context
-        const curatorNotes = await db.curatorNote.findMany({
+        }),
+        db.curatorNote.findMany({
           where: {
             artworkId: artworkId,
             museumId: museumId
@@ -71,9 +70,13 @@ export async function POST(req: NextRequest) {
           orderBy: {
             createdAt: 'desc'
           },
-          take: 5 // Limit to most recent 5 notes
-        });
+          take: 5
+        })
+      ]);
 
+      artwork = artworkResult;
+
+      if (artwork) {
         // Build context chunks from artwork and curator notes
         chunks = [
           {
@@ -141,6 +144,7 @@ export async function POST(req: NextRequest) {
       artwork: artworkData,
       visitorName: visitorName || undefined,
       docentName: docentName || undefined,
+      visitorProfile: visitorProfile || undefined,
     };
 
     if (useStream) {

@@ -23,7 +23,7 @@ export class EmbeddingsService {
   private embeddings: Map<string, number[]> = new Map(); // chunkId -> embedding
 
   constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
+    this.openai = new OpenAI({ apiKey, baseURL: 'https://api.openai.com/v1' });
   }
 
   // Chunk artwork data intelligently

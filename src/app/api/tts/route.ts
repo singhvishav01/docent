@@ -1,17 +1,8 @@
 import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
+import { prepareForSpeech } from '@/lib/voice/speechCleanup';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-function naturalizeText(text: string): string {
-  return text
-    .replace(/\.\.\./g, ' ')           // ellipsis -> space, no stop
-    .replace(/\.\s+/g, ' ')            // period + space -> space (removes hard stop between sentences)
-    .replace(/\.$/g, '')               // trailing period -> nothing
-    .replace(/—/g, ', ')               // em-dashes -> comma pause
-    .replace(/\s{2,}/g, ' ')           // clean double spaces
-    .trim();
-}
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, baseURL: 'https://api.openai.com/v1' });
 
 function addFillers(text: string): string {
   const wordCount = text.split(' ').length;
@@ -44,10 +35,11 @@ export async function POST(req: NextRequest) {
   if (!text?.trim()) {
     return new Response('Missing text', { status: 400 });
   }
+  const cleaned = addFillers(prepareForSpeech(text));
   const mp3 = await openai.audio.speech.create({
     model: 'tts-1',
     voice: 'onyx',
-    input: addFillers(naturalizeText(text)),
+    input: cleaned,
     speed: 0.95,
   });
   const buffer = Buffer.from(await mp3.arrayBuffer());

@@ -1,9 +1,10 @@
 // src/app/api/chat/transition/route.ts
-// Generates a natural, AI-written bridging message when the visitor moves to a new artwork
+// Generates a natural, AI-written bridging message when the visitor moves to a new artwork.
+// Uses gpt-4o at high temperature for creative, thematic connections.
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, baseURL: 'https://api.openai.com/v1' });
 
 export async function POST(req: NextRequest) {
   let body: any = {};
@@ -14,18 +15,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { previousTitle, previousArtist, newTitle, newArtist, newYear, lastMessages } = body;
+  const {
+    previousTitle,
+    previousArtist,
+    newTitle,
+    newArtist,
+    newYear,
+    lastMessages,
+    spokenSoFar,
+    visitorProfile,
+    isReturnVisit,
+    barelyStarted,
+    midQuestion,
+    midSpeech,
+  } = body;
 
   if (!newTitle) {
     return NextResponse.json({ error: 'newTitle is required' }, { status: 400 });
   }
 
-  // Fallback string used if AI fails
-  const fallback = `Moving on to "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}${newYear ? `, ${newYear}` : ''}.`;
+  const fallback = isReturnVisit
+    ? `Back to "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}. Let me share something new this time.`
+    : `Moving on to "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}${newYear ? `, ${newYear}` : ''}.`;
 
   try {
-    // Build a compact snippet of the last few messages so the AI can reference
-    // what was being discussed without a large token cost.
+    // Compact snippet of recent conversation
     let conversationSnippet = '';
     if (Array.isArray(lastMessages) && lastMessages.length > 0) {
       conversationSnippet = lastMessages
@@ -36,30 +50,80 @@ export async function POST(req: NextRequest) {
         .join('\n');
     }
 
-    const systemPrompt = `You are an expert museum docent guiding a visitor through a gallery.
-You speak in a warm, intelligent, and conversational tone — never robotic or stiff.
-You will receive the artwork the visitor was just looking at, the recent conversation, and the new artwork they have moved to.
-Write a single cohesive 2-3 sentence transition that:
-1. Briefly and gracefully wraps up the previous topic (only if there was active discussion worth closing)
-2. Naturally notices the visitor has moved on and introduces the new artwork
-Keep it under 65 words. Do NOT start with "I" or "Hello". Write as if walking alongside the visitor.`;
+    // Keep spokenSoFar tight — last ~300 chars is enough context
+    const spokenContext =
+      typeof spokenSoFar === 'string' && spokenSoFar.length > 0
+        ? spokenSoFar.slice(-300)
+        : '';
+
+    // Build tone guidance from visitor profile
+    let toneGuidance = '';
+    if (visitorProfile) {
+      const comm = visitorProfile.communication;
+      const eng = visitorProfile.engagement;
+      if (comm) {
+        const formality =
+          comm.formality > 0.6 ? 'formal' : comm.formality < 0.3 ? 'casual' : 'conversational';
+        const humor =
+          comm.humor_tolerance > 0.5 ? 'light humor welcome' : 'keep it straightforward';
+        toneGuidance = `Tone: ${formality}, ${humor}.`;
+      }
+      if (eng) {
+        const pace = eng.pace || 'medium';
+        toneGuidance += ` Pace: ${pace}.`;
+      }
+    }
+
+    const systemPrompt = `You are DOCENT — an expert museum guide walking alongside a visitor.
+You speak warmly, intelligently, and conversationally — never robotic or stiff.
+Your personality blends genuine curiosity, dry wit, and deep art knowledge.
+${toneGuidance ? '\n' + toneGuidance : ''}
+
+Your task: write a seamless spoken transition as the visitor moves from one artwork to the next.
+
+RULES:
+- Write 2-4 sentences total, under ${midSpeech ? '85' : '65'} words.
+- Do NOT start with "I" or "Hello" or "Welcome".
+- Write as if speaking aloud — short sentences, natural rhythm, contractions.
+- Try to find a thematic, visual, or historical connection between the two artworks.
+- If no obvious connection exists, use the physical act of moving to the next piece as the bridge.${
+  barelyStarted
+    ? '\n- The visitor barely engaged with the previous artwork. Skip the wrap-up entirely — just pivot fresh to the new artwork with an intriguing hook.'
+    : ''
+}${
+  isReturnVisit
+    ? '\n- The visitor has RETURNED to this artwork. Acknowledge the return briefly ("Back to this one?" / "This one pulled you back.") then offer a fresh angle they have not heard yet.'
+    : ''
+}${
+  midQuestion
+    ? '\n- The visitor was mid-question when they moved. Briefly close out the answer in one short sentence before bridging to the new artwork.'
+    : ''
+}${
+  midSpeech
+    ? '\n- You were mid-explanation when the visitor moved on. In your FIRST sentence, land the thought you were building toward — give it a clean conclusion. Then bridge to the new artwork. Do not just abandon what you were saying.'
+    : ''
+}`;
 
     const userPrompt = previousTitle
-      ? `The visitor was viewing "${previousTitle}" by ${previousArtist}.
-${conversationSnippet ? `Recent conversation:\n${conversationSnippet}\n\n` : ''}They have now moved to "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}${newYear ? ` (${newYear})` : ''}. Write the transition.`
+      ? `Previous artwork: "${previousTitle}"${previousArtist ? ` by ${previousArtist}` : ''}.
+${spokenContext ? `What I've said so far:\n"${spokenContext}"\n` : ''}${conversationSnippet ? `Recent conversation:\n${conversationSnippet}\n` : ''}
+New artwork: "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}${newYear ? ` (${newYear})` : ''}.
+
+Write the transition.`
       : `The visitor has arrived at "${newTitle}"${newArtist ? ` by ${newArtist}` : ''}${newYear ? ` (${newYear})` : ''}. Introduce it warmly in 1-2 sentences.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      max_tokens: 120,
-      temperature: 0.8,
+      max_tokens: 150,
+      temperature: 0.9,
     });
 
-    const transitionText = completion.choices[0]?.message?.content?.trim() ?? fallback;
+    const transitionText =
+      completion.choices[0]?.message?.content?.trim() ?? fallback;
 
     return NextResponse.json({ transition: transitionText });
   } catch (error) {

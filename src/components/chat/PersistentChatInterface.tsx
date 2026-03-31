@@ -1,7 +1,7 @@
 // src/components/chat/PersistentChatInterface.tsx
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MessageBubble } from './MessageBubble';
 import { SourceToggle } from './SourceToggle';
 import { DocentVoiceManager, VoiceMode } from '@/lib/voice/DocentVoiceManager';
@@ -10,6 +10,8 @@ import { VoiceTourButton } from '../voice/VoiceTourButton';
 import { useSession } from '@/contexts/SessionProvider';
 import { useVisitor } from '@/contexts/VisitorContext';
 import { useArtwork } from '@/contexts/ArtworkContext';
+import { applyHeuristics } from '@/lib/acquaintance/profile';
+import { TransitionManager } from '@/lib/tour/TransitionManager';
 
 interface ChatMessage {
   id: string;
@@ -44,8 +46,10 @@ export function PersistentChatInterface({
   artworkYear
 }: PersistentChatInterfaceProps) {
   const session = useSession();
-  const { visitorName, docentName } = useVisitor();
+  const { visitorName, docentName, visitorProfile, updateVisitorProfile } = useVisitor();
   const { activeArtwork: contextArtwork } = useArtwork();
+
+  const assistantMessageCountRef = useRef(0);
 
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -64,12 +68,23 @@ export function PersistentChatInterface({
   const [voiceSupported, setVoiceSupported] = useState(false);
 
   const lastArtworkIdRef = useRef<string>(artworkId);
-  const isTransitioningRef = useRef(false);
 
   const voiceManager = useRef<DocentVoiceManager | null>(null);
+  const transitionManager = useRef<TransitionManager | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const handleVoiceInputRef = useRef<(text: string) => Promise<void>>(async () => {});
+
+  // Track what docent has said about the current artwork — used for smart transitions
+  const spokenSoFarRef = useRef<string>('');
+  const sentenceCountRef = useRef<number>(0);
+
+  // Keep a stable ref to session + visitorProfile for callbacks that need fresh values
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const visitorProfileRef = useRef(visitorProfile);
+  visitorProfileRef.current = visitorProfile;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,12 +99,10 @@ export function PersistentChatInterface({
   }, []);
 
   useEffect(() => {
-    // If ArtworkPage already put the full data in context, use it — no fetch needed
     if (contextFull) {
       setActualMuseumId(contextFull.museumId || museumId);
       return;
     }
-    // Fallback: standalone usage (e.g. admin test-chat page) — fetch directly
     const loadArtwork = async () => {
       try {
         const response = await fetch(`/api/artworks/${artworkId}?museum=${museumId}`);
@@ -105,32 +118,52 @@ export function PersistentChatInterface({
     loadArtwork();
   }, [artworkId, museumId, contextFull]);
 
+  // ── TransitionManager setup ──────────────────────────────────────────────
   useEffect(() => {
-    const handleArtworkTransition = async () => {
-      if (lastArtworkIdRef.current === artworkId) return;
+    const tm = new TransitionManager({ dwellMs: 2000, cooldownMs: 3000 });
+    tm.setInitialArtwork(artworkId);
+    transitionManager.current = tm;
 
-      const previousArtworkId = lastArtworkIdRef.current;
-      lastArtworkIdRef.current = artworkId;
+    // Wire the callback — always uses latest refs
+    tm.onReady(async (request, context) => {
+      const s = sessionRef.current;
+      const vm = voiceManager.current;
+      const vp = visitorProfileRef.current;
 
-      if (!artworkTitle) return;
-
-      console.log(`[PersistentChat] 🎨 Transition: ${previousArtworkId} → ${artworkId}`);
-      isTransitioningRef.current = true;
+      console.log(
+        `[PersistentChat] Transition: "${request.previousArtworkId}" -> "${request.newArtworkId}"`
+      );
 
       try {
-        if (voiceManager.current && voiceMode === 'speaking') {
-          voiceManager.current.clearQueueKeepCurrent();
-          await voiceManager.current.waitForCurrentSentence(4000);
+        // 1. Finish current sentence gracefully if voice is active
+        const wasMidSpeech = !!(vm && s.isVoiceTourActive && vm.isCurrentlyPlaying());
+        if (wasMidSpeech) {
+          vm!.clearQueueKeepCurrent();
+          await vm!.waitForCurrentSentence(4000);
         }
 
-        const lastMessages = session.messages
-          .filter(m => m.artworkId === previousArtworkId)
+        // 2. Abort any in-flight LLM stream
+        if (streamAbortRef.current) {
+          streamAbortRef.current.abort();
+          streamAbortRef.current = null;
+        }
+
+        // 3. Detect mid-question: did the last visitor turn end with '?'
+        const prevMsgs = s.messages.filter(
+          (m: ChatMessage) => m.artworkId === request.previousArtworkId
+        );
+        const lastUserMsg = [...prevMsgs].reverse().find((m: ChatMessage) => m.role === 'user');
+        context.midQuestion = !!(lastUserMsg && lastUserMsg.content.trim().endsWith('?'));
+
+        // 4. Build prev-artwork info from message history
+        const prevAssistantMsgs = prevMsgs.filter((m: ChatMessage) => m.role === 'assistant');
+        const prevTitle = prevAssistantMsgs[0]?.artworkInfo?.title ?? undefined;
+        const prevArtist = prevAssistantMsgs[0]?.artworkInfo?.artist ?? undefined;
+        const lastMessages = prevMsgs
           .slice(-4)
-          .map(m => ({ role: m.role, content: m.content }));
+          .map((m: ChatMessage) => ({ role: m.role, content: m.content }));
 
-        const prevTitle = currentArtwork?.title ?? undefined;
-        const prevArtist = currentArtwork?.artist ?? undefined;
-
+        // 5. Call the upgraded transition API
         let transitionText: string;
         try {
           const res = await fetch('/api/chat/transition', {
@@ -139,48 +172,86 @@ export function PersistentChatInterface({
             body: JSON.stringify({
               previousTitle: prevTitle,
               previousArtist: prevArtist,
-              newTitle: artworkTitle,
-              newArtist: artworkArtist,
-              newYear: artworkYear,
+              newTitle: request.newTitle,
+              newArtist: request.newArtist,
+              newYear: request.newYear,
               lastMessages,
+              spokenSoFar: context.spokenSoFar,
+              visitorProfile: vp || null,
+              isReturnVisit: context.isReturnVisit,
+              barelyStarted: context.barelyStarted,
+              midQuestion: context.midQuestion,
+              midSpeech: wasMidSpeech,
             }),
           });
           const data = await res.json();
           transitionText = data.transition;
         } catch {
-          transitionText = `Moving on to "${artworkTitle}"${artworkArtist ? ` by ${artworkArtist}` : ''}${artworkYear ? `, ${artworkYear}` : ''}.`;
+          transitionText = context.isReturnVisit
+            ? `Back to "${request.newTitle}"${request.newArtist ? ` by ${request.newArtist}` : ''}. Let me share something new.`
+            : `Moving on to "${request.newTitle}"${request.newArtist ? ` by ${request.newArtist}` : ''}${request.newYear ? `, ${request.newYear}` : ''}.`;
         }
 
-        const transitionMessage: ChatMessage = {
-          id: `transition-${artworkId}-${Date.now()}`,
+        // 6. Add transition message to session
+        const transitionMsg: ChatMessage = {
+          id: `transition-${request.newArtworkId}-${Date.now()}`,
           content: transitionText,
           isUser: false,
           role: 'assistant',
           timestamp: new Date(),
-          artworkId: artworkId,
+          artworkId: request.newArtworkId,
           artworkInfo: {
-            id: artworkId,
-            title: artworkTitle,
-            artist: artworkArtist || 'Unknown Artist',
-            year: artworkYear,
+            id: request.newArtworkId,
+            title: request.newTitle,
+            artist: request.newArtist || 'Unknown Artist',
+            year: request.newYear,
           },
         };
-        session.addMessage(transitionMessage);
+        s.addMessage(transitionMsg);
 
-        if (session.isVoiceTourActive && voiceManager.current) {
-          voiceManager.current.enqueueSentence(transitionText);
-          voiceManager.current.finalizeQueue();
+        // 7. Enqueue to voice pipeline if active
+        if (s.isVoiceTourActive && vm) {
+          vm.enqueueSentence(transitionText);
+          vm.finalizeQueue();
+          vm.resetSentenceCount();
         }
+
+        // 8. Reset spokenSoFar tracking for the new artwork
+        spokenSoFarRef.current = '';
+        sentenceCountRef.current = 0;
+
       } catch (error) {
-        console.error('[PersistentChat] ❌ Transition error:', error);
-      } finally {
-        isTransitioningRef.current = false;
+        console.error('[PersistentChat] Transition callback error:', error);
       }
+    });
+
+    return () => {
+      tm.destroy();
+      transitionManager.current = null;
     };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    handleArtworkTransition();
-  }, [artworkId, artworkTitle, artworkArtist, artworkYear, session, currentArtwork, voiceMode]);
+  // ── Artwork change detection ──────────────────────────────────────────────
+  useEffect(() => {
+    if (lastArtworkIdRef.current === artworkId) return;
 
+    const previousArtworkId = lastArtworkIdRef.current;
+    lastArtworkIdRef.current = artworkId;
+
+    if (!artworkTitle) return;
+
+    console.log(`[PersistentChat] Artwork changed: ${previousArtworkId} -> ${artworkId}`);
+
+    transitionManager.current?.requestTransition({
+      previousArtworkId,
+      newArtworkId: artworkId,
+      newTitle: artworkTitle,
+      newArtist: artworkArtist,
+      newYear: artworkYear,
+    });
+  }, [artworkId, artworkTitle, artworkArtist, artworkYear]);
+
+  // ── Voice manager setup ───────────────────────────────────────────────────
   useEffect(() => {
     if (!voiceManager.current && voiceSupported) {
       voiceManager.current = new DocentVoiceManager({ silenceTimeout: 30000 });
@@ -226,7 +297,7 @@ export function PersistentChatInterface({
       await voiceManager.current.startTour(currentArtwork.id, currentArtwork.title, visitorName);
       session.startVoiceTour();
     } catch (error) {
-      console.error('[PersistentChat] ❌ Failed to start voice tour:', error);
+      console.error('[PersistentChat] Failed to start voice tour:', error);
       alert('Failed to start voice tour. Please check your microphone permissions.');
     } finally {
       setIsInitializingVoice(false);
@@ -242,7 +313,19 @@ export function PersistentChatInterface({
   };
 
   const handleVoiceInput = async (transcript: string) => {
-    if (!transcript.trim() || isTransitioningRef.current) return;
+    if (!transcript.trim()) return;
+
+    // If a transition is in progress, the visitor has moved on mentally.
+    // Abort the transition and treat their input as about the NEW artwork.
+    if (transitionManager.current?.isTransitioning()) {
+      console.log('[PersistentChat] Voice input during transition — aborting, treating as new artwork input');
+      transitionManager.current.abortTransition();
+      if (voiceManager.current) {
+        voiceManager.current.stopSpeaking();
+        voiceManager.current.clearQueueKeepCurrent();
+      }
+    }
+
     session.updateActivity();
     const userMessage: ChatMessage = {
       id: `user-voice-${Date.now()}`,
@@ -276,9 +359,38 @@ export function PersistentChatInterface({
     await sendMessageToAI(userMessage.content, false);
   };
 
+  const triggerDeepUpdateIfNeeded = (userMessage: string, assistantMessage: string) => {
+    if (!visitorProfile) return;
+    assistantMessageCountRef.current += 1;
+    if (assistantMessageCountRef.current % 5 !== 0) return;
+
+    const recentHistory = [
+      ...session.messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+      { role: 'user' as const, content: userMessage },
+      { role: 'assistant' as const, content: assistantMessage },
+    ];
+
+    fetch('/api/acquaintance/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile: visitorProfile, recentHistory }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.updatedProfile) updateVisitorProfile(data.updatedProfile);
+      })
+      .catch(err => console.error('[AcquaintanceUpdate] error:', err));
+  };
+
   const sendMessageToAI = async (content: string, isVoiceInput: boolean) => {
     const useStreaming = isVoiceInput && session.isVoiceTourActive && !!voiceManager.current;
     setIsLoading(true);
+
+    // Abort any in-flight stream from a previous call (e.g., user interrupted)
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
 
     const conversationHistory = session.messages
       .filter(m => m.artworkId === artworkId)
@@ -286,6 +398,18 @@ export function PersistentChatInterface({
       .map(m => ({ role: m.role, content: m.content }));
 
     try {
+      if (visitorProfile) {
+        const updated = applyHeuristics(visitorProfile, content);
+        updateVisitorProfile(updated);
+      }
+
+      const abort = new AbortController();
+      let voiceGen: number | undefined;
+      if (useStreaming && voiceManager.current) {
+        voiceGen = voiceManager.current.beginNewVoiceResponse();
+        streamAbortRef.current = abort;
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,55 +424,76 @@ export function PersistentChatInterface({
           stream: useStreaming,
           conversationHistory,
           voice: session.isVoiceTourActive,
+          visitorProfile: visitorProfile || null,
         }),
+        signal: useStreaming ? abort.signal : undefined,
       });
 
       if (!response.ok) throw new Error(`Chat API error: ${response.status}`);
 
       if (useStreaming && voiceManager.current) {
-        setIsLoading(false);
-
         const reader = response.body!.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
         let sentenceBuffer = '';
 
-        const extractSentences = (text: string): { sentences: string[]; remaining: string } => {
+        // Extract complete sentences (ending in .!? followed by space).
+        function extractSentences(buf: string): [string[], string] {
           const sentences: string[] = [];
-          const re = /[^.!?]+[.!?]["']?/g;
-          let lastIndex = 0;
-          let m: RegExpExecArray | null;
-          while ((m = re.exec(text)) !== null) {
-            const s = m[0].trim();
-            if (s.length > 1) sentences.push(s);
-            lastIndex = m.index + m[0].length;
+          let rest = buf;
+          const re = /^(.*?[.!?]['"]?)\s+/s;
+          let m;
+          while ((m = re.exec(rest)) !== null) {
+            const s = m[1].trim();
+            if (s) sentences.push(s);
+            rest = rest.slice(m[0].length);
           }
-          return { sentences, remaining: text.slice(lastIndex) };
-        };
+          return [sentences, rest];
+        }
 
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done || abort.signal.aborted) break;
             const chunk = decoder.decode(value, { stream: true });
             fullText += chunk;
             sentenceBuffer += chunk;
-            const { sentences, remaining } = extractSentences(sentenceBuffer);
+
+            const [sentences, remaining] = extractSentences(sentenceBuffer);
             sentenceBuffer = remaining;
-            for (const s of sentences) {
-              voiceManager.current!.enqueueSentence(s);
+            for (const sentence of sentences) {
+              if (!abort.signal.aborted) {
+                voiceManager.current!.enqueueSentence(sentence, voiceGen);
+                // Track for transition system
+                if (transitionManager.current) {
+                  transitionManager.current.appendSpoken(sentence);
+                  transitionManager.current.incrementSentenceCount();
+                }
+              }
             }
           }
-          if (sentenceBuffer.trim()) {
-            voiceManager.current!.enqueueSentence(sentenceBuffer.trim());
-          }
         } catch (streamErr) {
-          console.error('[PersistentChat] ❌ Stream read error:', streamErr);
+          if (!abort.signal.aborted) {
+            console.error('[PersistentChat] Stream read error:', streamErr);
+          }
         }
 
-        voiceManager.current!.finalizeQueue();
+        // Flush any remaining partial sentence
+        if (sentenceBuffer.trim() && !abort.signal.aborted) {
+          voiceManager.current.enqueueSentence(sentenceBuffer.trim(), voiceGen);
+          if (transitionManager.current) {
+            transitionManager.current.appendSpoken(sentenceBuffer.trim());
+            transitionManager.current.incrementSentenceCount();
+          }
+        }
+        if (!abort.signal.aborted) {
+          voiceManager.current.finalizeQueue();
+        }
 
-        if (fullText.trim()) {
+        streamAbortRef.current = null;
+        setIsLoading(false);
+
+        if (fullText.trim() && !abort.signal.aborted) {
           session.addMessage({
             id: `ai-${Date.now()}`,
             content: fullText.trim(),
@@ -357,6 +502,8 @@ export function PersistentChatInterface({
             timestamp: new Date(),
             artworkId,
           });
+          triggerDeepUpdateIfNeeded(content, fullText.trim());
+          // resumeListening() is called automatically by runSentenceQueue when the queue empties
         }
 
       } else {
@@ -366,9 +513,17 @@ export function PersistentChatInterface({
           setActualMuseumId(data.actualMuseumId);
         }
 
+        const assistantContent = data.response || 'I apologize, but I received an empty response. Please try again.';
+
+        // Track spokenSoFar even in text mode (for transition context)
+        if (transitionManager.current) {
+          transitionManager.current.appendSpoken(assistantContent);
+          transitionManager.current.incrementSentenceCount();
+        }
+
         session.addMessage({
           id: `ai-${Date.now()}`,
-          content: data.response || 'I apologize, but I received an empty response. Please try again.',
+          content: assistantContent,
           isUser: false,
           role: 'assistant',
           timestamp: new Date(),
@@ -382,11 +537,12 @@ export function PersistentChatInterface({
           contextUsed: data.context_used,
           curatorNotesCount: data.curator_notes_count,
         });
+        triggerDeepUpdateIfNeeded(content, assistantContent);
         setIsLoading(false);
       }
 
     } catch (error) {
-      console.error('[PersistentChat] ❌ Chat error:', error);
+      console.error('[PersistentChat] Chat error:', error);
       session.addMessage({
         id: `error-${Date.now()}`,
         content: 'I apologize, but I encountered an error. Please try again.',

@@ -5,7 +5,7 @@ import OpenAI from 'openai';
 import { db } from '../../../../lib/db';
 import { DOCENT_VOICE_PERSONA } from '../../../../lib/ai/docent-persona';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, baseURL: 'https://api.openai.com/v1' });
 
 export async function POST(req: NextRequest) {
   try {

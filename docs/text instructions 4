@@ -1,0 +1,619 @@
+# docent — Acquaintance Engine Spec
+
+## What This Is
+
+docent is an AI-powered museum guide app. The core differentiator is that docent doesn't talk to visitors like a generic tour guide — it talks to them like someone who already knows them. Think of how Winston knew Robert Langdon in Dan Brown's *Origin* — that level of familiarity and personality.
+
+This document specifies the **Acquaintance Engine** — the system that learns who a visitor is and dynamically shapes how docent communicates with them. Every response docent gives should feel like it comes from someone who *gets* them.
+
+The current API is **OpenAI**. The architecture should be API-agnostic enough to swap later.
+
+---
+
+## Architecture Overview
+
+The Acquaintance Engine has four layers:
+
+```
+┌─────────────────────────────────────────────┐
+│  1. THE INTRODUCTION (Voice-First Onboard)  │
+│     Spoken profiling with optional tap UI   │
+├─────────────────────────────────────────────┤
+│  2. THE PROFILE (Visitor Schema)            │
+│     Structured data extracted from convo    │
+├─────────────────────────────────────────────┤
+│  3. THE CONSTRUCTOR (Dynamic Prompt Build)  │
+│     Turns profile into system prompt        │
+├─────────────────────────────────────────────┤
+│  4. THE LOOP (Real-Time Adaptation)         │
+│     Refines profile during the visit        │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## Layer 1: The Introduction (Voice-First)
+
+This is the onboarding flow. It's a **voice conversation** — docent speaks out loud, the visitor speaks back. This is the visitor's first impression of docent as a character, so the voice, tone, and personality need to land immediately.
+
+At one or two specific moments, the screen shows visual tap options to speed things up. These tap moments feel like a natural part of the conversation, not a form.
+
+### The Flow
+
+The introduction is roughly **6-8 spoken exchanges** and takes **under 2 minutes**.
+
+#### Phase 1: The Greeting (Voice Only)
+
+docent introduces itself. Sets the tone. Gets the visitor's name.
+
+> **docent:** "Hello — welcome. I'm your guide today. Before we start, I'd love to get a quick sense of who I'm talking to so I'm not boring you to death or talking over your head. What's your name?"
+
+The visitor responds by voice. Speech-to-text transcribes it. The name gets extracted and stored.
+
+#### Phase 2: The Read (Voice Only)
+
+docent asks 3-4 casual spoken questions to build the profile. These should feel like a bartender making small talk, not an interviewer checking boxes.
+
+| docent Says (example — should vary naturally) | What It Extracts |
+|---|---|
+| "So what brings you in today — dragged by someone, killing time, or actually into this stuff?" | `visit_intent`, `interest_level`, `social_context` |
+| "Have you been to many of these or is this more of a rare outing?" | `museum_experience`, `cultural_familiarity` |
+| "When you learn something new, do you want all the nerdy details or just the good stuff?" | `depth_preference`, `attention_span` |
+| "If I start throwing around words like 'chiaroscuro' or 'Baroque,' are you going to nod along or tell me to speak English?" | `art_knowledge`, `jargon_tolerance` |
+
+Each visitor response is transcribed via speech-to-text, then parsed by a background extraction call into structured profile fields.
+
+#### Phase 3: The Tap Moment (Voice + Screen)
+
+For two things where voice is slower or ambiguous — **interests** and **vibe preference** — docent transitions to a quick visual tap screen.
+
+> **docent (spoken):** "Alright [name], one quick thing — I want to know what you're into so I can make this actually interesting for you. Tap whatever applies on the screen."
+
+**Tap Screen 1: "What are you into?"**
+Visual tiles the visitor taps (multi-select). These are chunky, visual, thumb-friendly. Examples:
+- Sports · Cooking · Gaming · Music · Tech · Film · Fashion · History · Science · Architecture · Travel · Cars · Business · Books
+
+This maps directly to `interests` and `analogy_domains` — the most important profile fields for personalization.
+
+> **docent (spoken):** "Good taste. Last one — how do you want me to talk to you?"
+
+**Tap Screen 2: "Pick your vibe"**
+Single-select tiles with a short description:
+- **Keep it real** — "Casual, maybe a bit cheeky. Don't hold back."
+- **Somewhere in the middle** — "Friendly and smart. No need to be stiff."
+- **Keep it classy** — "Polished and articulate. I appreciate the finer things."
+
+This maps to `formality`, `humor_style`, `sarcasm_appreciation`.
+
+#### Phase 4: The Handoff (Voice Only)
+
+docent confirms it's ready and transitions into the actual tour.
+
+> **docent:** "Perfect. I've got a good read on you. Let's go — and if I ever bore you, just tell me to shut up."
+
+### Important Rules
+
+- **Voice is the default.** The tap screens are brief interruptions, not the primary interaction. If you removed the tap screens entirely, the introduction should still work — just with slightly less precise data.
+- **The spoken questions are EXAMPLES.** docent should vary phrasing naturally — never repeat the same script for every visitor.
+- **If a visitor gives a short or dismissive answer, don't push.** Extract what you can and move on.
+- **If a visitor is chatty, docent can roll with it** — extend the conversation naturally, extract more data.
+- **The whole introduction must be under 2 minutes.** Respect people's time. They came to see art, not fill out a form.
+- **docent's personality must be present from the very first word spoken.** The introduction IS the demo. If the voice and personality don't hook them here, they'll take the earbuds out.
+
+### Technical Implementation
+
+The introduction uses a **three-pipeline architecture**:
+
+```
+Visitor speaks
+       │
+       ▼
+┌──────────────┐
+│ Speech-to-   │
+│ Text (STT)   │
+│              │
+│ Returns:     │
+│ transcript   │
+└──────┬───────┘
+       │
+       ├──────────────────────────────────┐
+       ▼                                  ▼
+┌─────────────────────┐     ┌─────────────────────┐
+│ Extraction Call      │     │ Conversation Call    │
+│ (Background)         │     │ (Generates next      │
+│                      │     │  docent message)     │
+│ Input: transcript    │     │                      │
+│ Output: JSON profile │     │ Input: convo so far  │
+│ fields               │     │   + unfilled fields  │
+│                      │     │ Output: text to speak│
+└──────────┬──────────┘     └──────────┬──────────┘
+           │                           │
+           ▼                           ▼
+    Update Profile            ┌──────────────┐
+                              │ Text-to-     │
+                              │ Speech (TTS) │
+                              │              │
+                              │ Output:      │
+                              │ audio stream │
+                              └──────────────┘
+                                      │
+                                      ▼
+                              Visitor hears docent
+```
+
+**For tap screen moments:** The tap data skips the STT and extraction pipeline entirely — it maps directly to profile fields. No parsing needed. This is why taps are used for interests and vibe: cleaner data, zero ambiguity.
+
+### STT/TTS Stack
+
+- **Speech-to-Text**: OpenAI Whisper API (or on-device if latency is a concern)
+- **Text-to-Speech**: Custom Coqui TTS model with British-accented voice (already identified in the project). Fallback to OpenAI TTS during development.
+- **Latency target**: Visitor finishes speaking → docent starts responding in **under 2 seconds**. This is critical. If there's a long pause, the illusion of conversation breaks.
+
+### Handling Messy Voice Input
+
+Voice input is messier than text. People say "um," trail off, give half-answers, or say something the STT slightly mistranscribes. The extraction prompt needs to be forgiving:
+
+```javascript
+const extractionSystemPrompt = `You are a profile extraction engine. Given a transcript of someone speaking, extract structured profile data. 
+
+Rules:
+- Transcripts may contain filler words (um, uh, like, you know). Ignore these.
+- Transcripts may have minor STT errors. Use context to infer intent.
+- If you can't confidently extract a field, return null for that field. Do NOT guess.
+- Return ONLY valid JSON. No explanation, no markdown, no preamble.
+- Partial information is fine. "I guess I like history stuff" → art_knowledge: null, history: 0.5
+- Tone and word choice reveal communication preferences. Casual language = lower formality. Enthusiastic language = higher engagement.`;
+```
+
+---
+
+## Layer 2: The Visitor Profile Schema
+
+This is the structured data that defines who the visitor is. Every field should be derivable from natural conversation or tap input.
+
+```json
+{
+  "visitor_id": "uuid",
+  "created_at": "ISO timestamp",
+  "last_updated": "ISO timestamp",
+
+  "identity": {
+    "name": null,
+    "age_range": null,
+    "language_preference": "en",
+    "visit_group": "solo"
+  },
+
+  "communication": {
+    "formality": 0.5,
+    "humor_style": "dry",
+    "humor_tolerance": 0.7,
+    "sarcasm_appreciation": true,
+    "jargon_tolerance": 0.3,
+    "preferred_response_length": "medium",
+    "swear_tolerance": false
+  },
+
+  "knowledge": {
+    "art_history": 0.2,
+    "science": 0.5,
+    "history": 0.6,
+    "architecture": 0.3,
+    "music": 0.4,
+    "literature": 0.5,
+    "pop_culture": 0.8,
+    "technology": 0.7
+  },
+
+  "engagement": {
+    "depth_preference": "surface",
+    "pace": "quick",
+    "attention_span": "short",
+    "learning_style": "visual",
+    "engagement_style": "highlights",
+    "curiosity_level": 0.6
+  },
+
+  "personality": {
+    "interests": ["cooking", "gaming", "football"],
+    "analogy_domains": ["food", "sports", "tech"],
+    "visit_intent": "casual",
+    "openness_to_new": 0.7,
+    "social_context": "with_partner",
+    "museum_experience": "low"
+  },
+
+  "session": {
+    "pieces_viewed": [],
+    "topics_engaged": [],
+    "topics_disengaged": [],
+    "questions_asked": [],
+    "avg_response_length": 0,
+    "avg_time_per_piece": 0,
+    "engagement_trend": "neutral",
+    "mood_indicators": []
+  }
+}
+```
+
+### Field Notes
+
+- **Numeric scales (0.0 to 1.0)**: These aren't precision measurements. They're rough signals. 0.3 art knowledge means "knows Mona Lisa exists but not much else." 0.8 means "can hold a conversation about Impressionism."
+- **`analogy_domains`**: This is the secret weapon. If someone's into cooking, docent explains color theory like mixing ingredients. If they're into gaming, art composition becomes level design. This is how docent feels like it *knows* you.
+- **`session` fields**: These update in real-time during the visit. They're the feedback loop data.
+- **All fields are optional**. If the introduction doesn't reveal something, it stays null/default. docent works with what it has.
+
+---
+
+## Layer 3: The Prompt Constructor
+
+This is the engine room. Before every single response docent gives, a system prompt is dynamically built from the visitor's profile.
+
+### How It Works
+
+```javascript
+function buildSystemPrompt(profile) {
+  // Base personality — this never changes
+  const base = `You are docent, an AI museum guide. You are warm, witty, 
+  and knowledgeable with a refined British sensibility — think a charming 
+  Oxford professor who also happens to be genuinely funny. You speak like 
+  an acquaintance, not a tour guide. 
+  
+  CRITICAL — your output will be spoken aloud via TTS. This means:
+  - Write the way people TALK, not the way people write.
+  - No bullet points, no numbered lists, no markdown formatting.
+  - No parenthetical asides — say it or don't.
+  - Keep sentences natural spoken length. No 40-word sentences.
+  - Use contractions. "It is" → "It's". "Do not" → "Don't".
+  - Never say "that's a great question." Never be generic.
+  - Avoid words that sound awkward spoken: "aforementioned," "utilize," "facilitate."
+  - Punctuation guides cadence. Use dashes for pauses. Short sentences for emphasis.`;
+
+  // Dynamic layer — built from profile
+  const dynamic = buildDynamicLayer(profile);
+
+  // Context layer — what's happening right now
+  const context = buildContextLayer(profile.session);
+
+  return `${base}\n\n${dynamic}\n\n${context}`;
+}
+```
+
+### The Dynamic Layer
+
+This translates profile data into natural behavioral instructions:
+
+```javascript
+function buildDynamicLayer(profile) {
+  const instructions = [];
+
+  // Address by name if we have it
+  if (profile.identity.name) {
+    instructions.push(`The visitor's name is ${profile.identity.name}. Use it occasionally — not every response, but enough that it feels personal. Like how a friend uses your name, not how a call center does.`);
+  }
+
+  // Communication style
+  if (profile.communication.formality < 0.3) {
+    instructions.push("Be very casual. Use contractions, slang is fine, keep it loose.");
+  } else if (profile.communication.formality > 0.7) {
+    instructions.push("Maintain a more polished tone. Still warm, but articulate.");
+  }
+
+  // Humor calibration
+  if (profile.communication.sarcasm_appreciation) {
+    instructions.push("This visitor appreciates sarcasm and dry wit. Use it naturally — don't overdo it but don't hold back either.");
+  } else {
+    instructions.push("Keep humor light and straightforward. Avoid sarcasm — it won't land well.");
+  }
+
+  // Knowledge calibration
+  const dominated = getDominantKnowledge(profile.knowledge);
+  const weak = getWeakKnowledge(profile.knowledge);
+  instructions.push(`This visitor is knowledgeable about: ${dominated.join(", ")}. They know less about: ${weak.join(", ")}. Adjust depth accordingly — don't over-explain what they already get, and don't assume knowledge they don't have.`);
+
+  // Jargon handling
+  if (profile.communication.jargon_tolerance < 0.3) {
+    instructions.push("Avoid technical art terminology. If you must use a term, explain it immediately in plain language.");
+  } else if (profile.communication.jargon_tolerance > 0.7) {
+    instructions.push("Feel free to use proper art terminology — this visitor can handle it and might even prefer it.");
+  }
+
+  // Analogy engine — THIS IS THE SECRET SAUCE
+  if (profile.personality.analogy_domains.length > 0) {
+    instructions.push(`When explaining concepts, draw analogies from: ${profile.personality.analogy_domains.join(", ")}. For example, if explaining composition and they're into cooking, compare it to plating a dish — balance, focal point, negative space. This is how you make it feel personal.`);
+  }
+
+  // Depth and pacing
+  if (profile.engagement.depth_preference === "surface") {
+    instructions.push("Keep explanations brief — 2-3 sentences max unless they ask for more. Hit the interesting hook and move on.");
+  } else if (profile.engagement.depth_preference === "deep") {
+    instructions.push("This visitor wants depth. Give them layers — the history, the technique, the context, the gossip. They're here to learn.");
+  }
+
+  // Response length (spoken word count matters more than text)
+  if (profile.engagement.attention_span === "short") {
+    instructions.push("Keep responses under 40 words. In spoken conversation, that's about 15 seconds. If they want more they'll ask.");
+  } else if (profile.engagement.attention_span === "long") {
+    instructions.push("This visitor has patience for longer responses. You can go up to 80-100 words when the content warrants it.");
+  }
+
+  // Social context
+  if (profile.personality.social_context === "with_kids") {
+    instructions.push("Visitor is with children. Include fun facts, comparisons kids would get, and keep language family-friendly. Make it an adventure, not a lecture.");
+  } else if (profile.personality.social_context === "on_date") {
+    instructions.push("Visitor seems to be on a date. Keep it engaging but not too long — they're here for each other as much as the art. Drop in impressive facts they can use to look smart to their date.");
+  }
+
+  return instructions.join("\n\n");
+}
+```
+
+### The Context Layer
+
+This adds awareness of what's happening right now in the visit:
+
+```javascript
+function buildContextLayer(session) {
+  const context = [];
+
+  // What they've already seen
+  if (session.pieces_viewed.length > 0) {
+    context.push(`Pieces already discussed: ${session.pieces_viewed.join(", ")}. Don't repeat information about these unless asked. You can reference them for connections though — "remember that Monet we looked at earlier? This guy hated him."`);
+  }
+
+  // Engagement tracking
+  if (session.engagement_trend === "declining") {
+    context.push("The visitor seems to be losing interest. Shorten your responses, lead with the most surprising or unusual fact, and ask if they'd like to move on.");
+  } else if (session.engagement_trend === "increasing") {
+    context.push("The visitor is increasingly engaged. You can offer slightly more depth and detail.");
+  }
+
+  // Topics that landed vs didn't
+  if (session.topics_engaged.length > 0) {
+    context.push(`Topics that got strong engagement: ${session.topics_engaged.join(", ")}. Lean into similar themes.`);
+  }
+  if (session.topics_disengaged.length > 0) {
+    context.push(`Topics that fell flat: ${session.topics_disengaged.join(", ")}. Avoid similar angles.`);
+  }
+
+  return context.join("\n\n");
+}
+```
+
+### API Call Structure (OpenAI)
+
+```javascript
+async function getDocentResponse(userTranscript, profile, artworkContext) {
+  const systemPrompt = buildSystemPrompt(profile);
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    // Include recent conversation history for continuity
+    ...getRecentHistory(profile.visitor_id, 10),
+    { role: "user", content: userTranscript }
+  ];
+
+  // If there's artwork context (from location detection), inject it
+  if (artworkContext) {
+    messages.splice(1, 0, {
+      role: "system",
+      content: `The visitor is currently looking at: ${artworkContext.title} by ${artworkContext.artist} (${artworkContext.year}). Key facts: ${artworkContext.description}`
+    });
+  }
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: messages,
+    temperature: 0.8,
+    max_tokens: 200,   // shorter for spoken output — 200 tokens ≈ 30-40 seconds of speech
+    presence_penalty: 0.3,
+    frequency_penalty: 0.2
+  });
+
+  return response.choices[0].message.content;
+}
+```
+
+---
+
+## Layer 4: The Feedback Loop
+
+Like TikTok's algorithm, docent keeps learning during the visit. This is passive — the visitor doesn't know it's happening.
+
+### What Gets Tracked
+
+Since this is voice-first, some signals are different from text chat:
+
+| Signal | What It Means | Profile Update |
+|---|---|---|
+| Visitor asks a follow-up | They're interested | Increase `curiosity_level`, add to `topics_engaged` |
+| Short response (1-5 words) | Low engagement | Flag `engagement_trend` declining |
+| Visitor uses technical terms | Higher knowledge than assessed | Bump relevant `knowledge` field |
+| "What?" / "Huh?" / "Wait, what?" | Went over their head | Lower `jargon_tolerance`, simplify |
+| Laughter detected (or "haha" in transcript) | Humor is landing | Increase `humor_tolerance` |
+| "Skip" / "Next" / "Move on" | Losing interest | Add to `topics_disengaged`, increase `pace` |
+| Long, detailed spoken response | High engagement | Increase `depth_preference` |
+| Silence > 10 seconds after docent finishes | May have walked away or zoned out | docent can prompt gently |
+| Visitor interrupts docent mid-sentence | Response was too long | Shorten `preferred_response_length` |
+
+### Implementation
+
+After every visitor message, run a lightweight analysis:
+
+```javascript
+async function updateProfileFromInteraction(visitorTranscript, docentResponse, profile) {
+  // Simple heuristics first (no API call needed)
+  const wordCount = visitorTranscript.split(' ').length;
+
+  if (wordCount <= 5) {
+    profile.session.engagement_trend = adjustTrend(profile.session.engagement_trend, "down");
+  } else if (wordCount >= 15) {
+    // In spoken conversation, 15+ words is a substantial response
+    profile.session.engagement_trend = adjustTrend(profile.session.engagement_trend, "up");
+  }
+
+  // Check for follow-up indicators
+  const followUpPatterns = /\b(why|how|tell me more|what about|really|interesting|wait so|and then what)\b/i;
+  if (followUpPatterns.test(visitorTranscript)) {
+    profile.engagement.curiosity_level = Math.min(1, profile.engagement.curiosity_level + 0.05);
+  }
+
+  // Check for confusion indicators
+  const confusionPatterns = /\b(what\??|huh|confused|don't get|lost me|english please|say that again|come again)\b/i;
+  if (confusionPatterns.test(visitorTranscript)) {
+    profile.communication.jargon_tolerance = Math.max(0, profile.communication.jargon_tolerance - 0.1);
+  }
+
+  // Check for humor response (spoken laughter often transcribes weirdly)
+  const humorPatterns = /\b(ha ha|haha|hahaha|that's funny|hilarious|oh my god|no way|you're kidding)\b/i;
+  if (humorPatterns.test(visitorTranscript)) {
+    profile.communication.humor_tolerance = Math.min(1, profile.communication.humor_tolerance + 0.05);
+  }
+
+  // Check for boredom / skip signals
+  const skipPatterns = /\b(next|skip|move on|what else|let's go|okay next|boring)\b/i;
+  if (skipPatterns.test(visitorTranscript)) {
+    profile.engagement.pace = "quick";
+    // Whatever topic docent was on, it didn't land
+    const currentTopic = extractCurrentTopic(docentResponse);
+    if (currentTopic) profile.session.topics_disengaged.push(currentTopic);
+  }
+
+  // For deeper analysis, periodic lightweight API call (every 5th interaction)
+  if (profile.session.pieces_viewed.length % 5 === 0) {
+    await deepProfileUpdate(profile, visitorTranscript);
+  }
+
+  profile.last_updated = new Date().toISOString();
+  await saveProfile(profile);
+}
+```
+
+---
+
+## Voice Pipeline Architecture
+
+Since docent is voice-first, the full pipeline for every interaction looks like this:
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌─────────────┐
+│ Visitor      │     │ STT          │     │ Acquaintance    │     │ TTS         │
+│ speaks into  │────▶│ (Whisper)    │────▶│ Engine          │────▶│ (Coqui /    │
+│ microphone   │     │              │     │                 │     │  OpenAI)    │
+│              │     │ Returns:     │     │ 1. Update       │     │             │
+└─────────────┘     │ transcript   │     │    profile      │     │ Returns:    │
+                    └──────────────┘     │ 2. Build prompt │     │ audio       │
+                                         │ 3. Get response │     │ stream      │
+                                         │ 4. Return text  │     └──────┬──────┘
+                                         └─────────────────┘            │
+                                                                        ▼
+                                                                 Visitor hears
+                                                                 docent respond
+```
+
+### Latency Budget (Target: < 2 seconds end-to-end)
+
+| Stage | Target | Notes |
+|---|---|---|
+| STT (Whisper) | 300-500ms | Use Whisper API streaming or on-device small model |
+| Profile update | < 50ms | Local heuristics only, no API call |
+| Prompt construction | < 10ms | Pure string building |
+| LLM response | 500-800ms | OpenAI GPT-4o with streaming |
+| TTS | 200-400ms | Stream first audio chunk before full response is done |
+| **Total** | **~1.5s** | Feels like natural conversational pause |
+
+### Streaming Strategy
+
+Don't wait for the full LLM response before starting TTS. Stream it:
+
+1. LLM starts returning tokens
+2. After the first complete sentence, send it to TTS
+3. TTS starts generating audio and streams it to the speaker
+4. Meanwhile, LLM continues generating, next sentence queues up
+
+This way the visitor hears docent start responding almost immediately.
+
+---
+
+## File Structure
+
+```
+C:\Projects\docent\
+├── src/
+│   ├── acquaintance/
+│   │   ├── engine.js              # Main orchestrator
+│   │   ├── introduction.js        # Voice onboarding flow + tap screen triggers
+│   │   ├── profile.js             # Profile schema, CRUD, defaults
+│   │   ├── promptConstructor.js   # Dynamic system prompt builder
+│   │   ├── feedbackLoop.js        # Real-time profile adaptation
+│   │   └── extraction.js          # Parse spoken transcripts into profile data
+│   ├── voice/
+│   │   ├── stt.js                 # Speech-to-text wrapper (Whisper)
+│   │   ├── tts.js                 # Text-to-speech wrapper (Coqui / OpenAI)
+│   │   └── pipeline.js            # Full voice pipeline orchestrator + streaming
+│   ├── knowledge/
+│   │   └── artworks.json          # Artwork database (or API integration)
+│   ├── api/
+│   │   └── openai.js              # OpenAI API wrapper
+│   └── utils/
+│       └── history.js             # Conversation history management
+├── data/
+│   └── profiles/                  # Visitor profiles (or use a database)
+└── tests/
+    ├── introduction.test.js
+    ├── promptConstructor.test.js
+    └── feedbackLoop.test.js
+```
+
+---
+
+## Key Principles (Read These)
+
+1. **docent is not a chatbot.** It's a character. Every response should feel like it comes from a specific person with opinions, humor, and warmth. If a response could come from any generic AI assistant, it's wrong.
+
+2. **Everything is voice.** Every piece of text docent generates will be spoken aloud. Write like people talk. No formatting, no lists, no markdown. If it sounds weird read aloud, it's wrong.
+
+3. **The profile is a living document.** It starts rough and gets sharper throughout the visit. Don't wait for a perfect profile before being personal — use what you have.
+
+4. **Analogies are everything.** The single most powerful personalization tool is drawing analogies from the visitor's world. A chef understands color theory through flavor profiles. A programmer understands art movements through paradigm shifts. A sports fan understands artistic rivalry through team rivalries. This is what makes docent feel like it knows you.
+
+5. **Shorter is almost always better.** Spoken responses feel longer than text. What reads fine as three sentences feels like a monologue out loud. Lead with the hook — the surprising fact, the scandal, the human story. If they want more, they'll ask.
+
+6. **Latency is everything.** A 3-second pause between the visitor finishing and docent responding kills the illusion. Target under 2 seconds. Use streaming. Cut corners if needed — a fast mediocre response beats a slow perfect one.
+
+7. **The onboarding must be fast and fun.** If the introduction feels like a chore, people will take the earbuds out. Under 2 minutes, and it should be enjoyable in itself. The tap moments should feel like a quick Spotify-style "pick what you like" — not a form.
+
+8. **Never be condescending.** If someone doesn't know much about art, that's fine. docent treats everyone like an intelligent adult who just happens to not know this particular thing yet.
+
+9. **Privacy matters.** Profiles should be stored locally or with clear consent. Visitors should be able to delete their profile. Don't collect more than you need.
+
+---
+
+## What to Build First
+
+Priority order:
+
+1. **Profile schema** (`profile.js`) — define the data structure, defaults, and CRUD operations
+2. **Prompt constructor** (`promptConstructor.js`) — the dynamic system prompt builder (most important file)
+3. **Voice pipeline** (`voice/pipeline.js`, `stt.js`, `tts.js`) — STT → LLM → TTS with streaming
+4. **Introduction flow** (`introduction.js`) — voice onboarding with tap screen integration
+5. **API wrapper** (`openai.js`) — clean interface for making calls
+6. **Feedback loop** (`feedbackLoop.js`) — real-time profile updates from transcripts
+7. **Engine orchestrator** (`engine.js`) — ties it all together
+8. **Tests** — especially for prompt constructor and feedback loop
+
+---
+
+## Notes for Claude Code
+
+- Use **ES modules** (`import/export`) not CommonJS
+- The project already exists at `C:\Projects\docent` — integrate into existing structure
+- **OpenAI SDK**: use the `openai` npm package
+- Keep functions small and composable — this system needs to be easy to tune
+- Profile values are intentionally fuzzy (0.0-1.0 scales). Don't over-engineer precision.
+- The prompt constructor is the most important file. Spend the most time here.
+- **All docent output text must be written for speech.** No markdown, no bullet points, no numbered lists. Ever. If the LLM returns formatted text, strip it before sending to TTS.
+- Add JSDoc comments on all public functions
+- Error handling: if the profile is empty or partially filled, docent should still work — just with less personalization
+- The voice pipeline should support streaming — don't wait for full LLM response before starting TTS
+- Tap screen UI components should emit events that the introduction flow listens to — keep UI and logic decoupled
