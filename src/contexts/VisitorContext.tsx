@@ -22,11 +22,19 @@ interface VisitorContextValue {
 
 const VisitorContext = createContext<VisitorContextValue | null>(null);
 
-const STORAGE_KEYS = {
+// Registered users: localStorage (persists across sessions — they have accounts)
+const LS_KEYS = {
   name: 'docent_visitor_name',
   type: 'docent_visitor_type',
   docentName: 'docent-chosen-name',
   profile: 'docent_visitor_profile',
+} as const;
+
+// Guests: sessionStorage (cleared when the tab/browser closes — guests are ephemeral)
+const SS_KEYS = {
+  name: 'docent_guest_name',
+  docentName: 'docent_guest_docent_name',
+  profile: 'docent_guest_profile',
 } as const;
 
 // How long to wait after the last update before flushing to DB (ms)
@@ -72,7 +80,6 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (pendingProfileRef.current && isRegisteredRef.current) {
-        // Use sendBeacon for reliable delivery on page unload
         navigator.sendBeacon(
           '/api/profile/personality',
           new Blob(
@@ -88,33 +95,70 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
 
   // ── On mount: rehydrate identity ─────────────────────────────────────────────
   // Priority order:
-  //   1. localStorage (fastest, works offline)
-  //   2. JWT auth session → then pull profile from DB (overrides localStorage)
+  //   1. Registered users: rehydrate from localStorage (persists across sessions)
+  //   2. Guests: rehydrate from sessionStorage ONLY (ephemeral — clears on tab close)
+  //      Any old guest data sitting in localStorage is cleaned up here.
+  //   3. JWT auth session → pull fresh profile from DB (overrides localStorage)
 
   useEffect(() => {
     let identifiedFromStorage = false;
 
     try {
-      const savedName = localStorage.getItem(STORAGE_KEYS.name);
-      const savedType = localStorage.getItem(STORAGE_KEYS.type) as VisitorType;
-      const savedDocentName = localStorage.getItem(STORAGE_KEYS.docentName);
-      const savedProfile = localStorage.getItem(STORAGE_KEYS.profile);
+      const savedType = localStorage.getItem(LS_KEYS.type) as VisitorType;
 
-      if (savedName && (savedType === 'guest' || savedType === 'registered')) {
-        setVisitorName(savedName);
-        setVisitorType(savedType);
-        identifiedFromStorage = true;
-        if (savedType === 'registered') isRegisteredRef.current = true;
-      }
-      if (savedDocentName) {
-        setDocentNameState(savedDocentName);
-        docentNameRef.current = savedDocentName;
-      }
-      if (savedProfile) {
-        setVisitorProfileState(JSON.parse(savedProfile));
+      if (savedType === 'registered') {
+        // Registered user — restore from localStorage
+        const savedName = localStorage.getItem(LS_KEYS.name);
+        const savedDocentName = localStorage.getItem(LS_KEYS.docentName);
+        const savedProfile = localStorage.getItem(LS_KEYS.profile);
+
+        if (savedName) {
+          setVisitorName(savedName);
+          setVisitorType('registered');
+          isRegisteredRef.current = true;
+          identifiedFromStorage = true;
+        }
+        if (savedDocentName) {
+          setDocentNameState(savedDocentName);
+          docentNameRef.current = savedDocentName;
+        }
+        if (savedProfile) {
+          setVisitorProfileState(JSON.parse(savedProfile));
+        }
+      } else if (savedType === 'guest') {
+        // Old guest data sitting in localStorage — clean it up.
+        // Guests never persist across sessions.
+        localStorage.removeItem(LS_KEYS.name);
+        localStorage.removeItem(LS_KEYS.type);
+        localStorage.removeItem(LS_KEYS.docentName);
+        localStorage.removeItem(LS_KEYS.profile);
       }
     } catch {
       // localStorage unavailable
+    }
+
+    // Restore guest session data from sessionStorage (same-tab navigation only)
+    if (!identifiedFromStorage) {
+      try {
+        const sessionName = sessionStorage.getItem(SS_KEYS.name);
+        const sessionDocentName = sessionStorage.getItem(SS_KEYS.docentName);
+        const sessionProfile = sessionStorage.getItem(SS_KEYS.profile);
+
+        if (sessionName) {
+          setVisitorName(sessionName);
+          setVisitorType('guest');
+          identifiedFromStorage = true;
+        }
+        if (sessionDocentName) {
+          setDocentNameState(sessionDocentName);
+          docentNameRef.current = sessionDocentName;
+        }
+        if (sessionProfile) {
+          setVisitorProfileState(JSON.parse(sessionProfile));
+        }
+      } catch {
+        // sessionStorage unavailable
+      }
     }
 
     // Always check JWT session — if logged in, pull fresh profile from DB
@@ -122,7 +166,6 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
       .then(r => (r.ok ? r.json() : null))
       .then(async user => {
         if (!user?.id) {
-          // Not logged in — loading is complete, rely on localStorage
           setIsProfileLoading(false);
           return;
         }
@@ -134,32 +177,31 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
 
         if (!identifiedFromStorage) {
           try {
-            localStorage.setItem(STORAGE_KEYS.name, name);
-            localStorage.setItem(STORAGE_KEYS.type, 'registered');
+            localStorage.setItem(LS_KEYS.name, name);
+            localStorage.setItem(LS_KEYS.type, 'registered');
           } catch { /* ignore */ }
         }
 
-        // Pull personality from DB — this is the source of truth for registered users
+        // Pull personality from DB — source of truth for registered users
         try {
           const res = await fetch('/api/profile/personality');
           if (res.ok) {
             const data = await res.json();
             if (data.profile) {
-              // DB profile wins over localStorage for registered users
               setVisitorProfileState(data.profile as VisitorProfile);
               try {
-                localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(data.profile));
+                localStorage.setItem(LS_KEYS.profile, JSON.stringify(data.profile));
               } catch { /* ignore */ }
             }
             if (data.docentName) {
               setDocentNameState(data.docentName);
               docentNameRef.current = data.docentName;
               try {
-                localStorage.setItem(STORAGE_KEYS.docentName, data.docentName);
+                localStorage.setItem(LS_KEYS.docentName, data.docentName);
               } catch { /* ignore */ }
             }
           }
-        } catch { /* ignore — fall back to localStorage profile */ }
+        } catch { /* fall back to localStorage profile */ }
 
         setIsProfileLoading(false);
       })
@@ -171,27 +213,45 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
   const setVisitorIdentity = (name: string, type: 'guest' | 'registered') => {
     setVisitorName(name);
     setVisitorType(type);
-    if (type === 'registered') isRegisteredRef.current = true;
-    try {
-      localStorage.setItem(STORAGE_KEYS.name, name);
-      localStorage.setItem(STORAGE_KEYS.type, type);
-    } catch { /* ignore */ }
+    if (type === 'registered') {
+      isRegisteredRef.current = true;
+      try {
+        localStorage.setItem(LS_KEYS.name, name);
+        localStorage.setItem(LS_KEYS.type, type);
+      } catch { /* ignore */ }
+    } else {
+      // Guest: session-scoped only — no localStorage persistence
+      try {
+        sessionStorage.setItem(SS_KEYS.name, name);
+        // Clean up any stale localStorage guest data
+        localStorage.removeItem(LS_KEYS.name);
+        localStorage.removeItem(LS_KEYS.type);
+      } catch { /* ignore */ }
+    }
   };
 
   const setDocentName = (name: string) => {
     setDocentNameState(name);
     docentNameRef.current = name;
     try {
-      localStorage.setItem(STORAGE_KEYS.docentName, name);
+      if (isRegisteredRef.current) {
+        localStorage.setItem(LS_KEYS.docentName, name);
+      } else {
+        sessionStorage.setItem(SS_KEYS.docentName, name);
+      }
     } catch { /* ignore */ }
   };
 
   const setVisitorProfile = (profile: VisitorProfile) => {
     setVisitorProfileState(profile);
     try {
-      localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profile));
+      if (isRegisteredRef.current) {
+        localStorage.setItem(LS_KEYS.profile, JSON.stringify(profile));
+      } else {
+        sessionStorage.setItem(SS_KEYS.profile, JSON.stringify(profile));
+      }
     } catch { /* ignore */ }
-    // Immediately flush to DB — this is called at end of onboarding (high value moment)
+    // Immediately flush to DB for registered users — high value moment (end of onboarding)
     if (isRegisteredRef.current) {
       flushProfileToDB(profile, docentNameRef.current);
     }
@@ -202,9 +262,12 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
       if (!prev) return prev;
       const updated = { ...prev, ...patch };
       try {
-        localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(updated));
+        if (isRegisteredRef.current) {
+          localStorage.setItem(LS_KEYS.profile, JSON.stringify(updated));
+        } else {
+          sessionStorage.setItem(SS_KEYS.profile, JSON.stringify(updated));
+        }
       } catch { /* ignore */ }
-      // Debounced DB write — don't hammer the DB on every message
       scheduleDBFlush(updated);
       return updated;
     });
@@ -215,8 +278,10 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     setDocentNameState(null);
     docentNameRef.current = null;
     try {
-      localStorage.removeItem(STORAGE_KEYS.profile);
-      localStorage.removeItem(STORAGE_KEYS.docentName);
+      localStorage.removeItem(LS_KEYS.profile);
+      localStorage.removeItem(LS_KEYS.docentName);
+      sessionStorage.removeItem(SS_KEYS.profile);
+      sessionStorage.removeItem(SS_KEYS.docentName);
     } catch { /* ignore */ }
   };
 
@@ -230,10 +295,13 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     docentNameRef.current = null;
     pendingProfileRef.current = null;
     try {
-      localStorage.removeItem(STORAGE_KEYS.name);
-      localStorage.removeItem(STORAGE_KEYS.type);
-      localStorage.removeItem(STORAGE_KEYS.docentName);
-      localStorage.removeItem(STORAGE_KEYS.profile);
+      localStorage.removeItem(LS_KEYS.name);
+      localStorage.removeItem(LS_KEYS.type);
+      localStorage.removeItem(LS_KEYS.docentName);
+      localStorage.removeItem(LS_KEYS.profile);
+      sessionStorage.removeItem(SS_KEYS.name);
+      sessionStorage.removeItem(SS_KEYS.docentName);
+      sessionStorage.removeItem(SS_KEYS.profile);
     } catch { /* ignore */ }
   };
 
