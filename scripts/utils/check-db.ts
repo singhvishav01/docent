@@ -13,13 +13,13 @@ async function main() {
     console.log(` - ${m.id} | ${m.name} | artworks: ${m._count.artworks}`)
   }
 
-const artworks = await prisma.artwork.findMany({ 
+const artworks = await prisma.artwork.findMany({
     take: 10,
-    include: { Museum: { select: { id: true } } }
+    include: { museum: { select: { id: true } } }
 })
   console.log(`\nSample artworks (${artworks.length} shown):`)
   for (const a of artworks) {
-    console.log(` - ${a.id} | ${a.title} | museumId: ${a.museum.id}`)
+    console.log(` - ${a.id} | ${a.title} | museumId: ${a.museumId}`)
   }
 
   await prisma.$disconnect()

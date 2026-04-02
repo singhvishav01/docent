@@ -153,7 +153,7 @@ export class DocentVoiceManager {
     this.clearSilenceTimer();
     this.setMode('dormant');
     this.currentArtwork = null;
-    if (this.pipeline) { this.pipeline.destroy(); this.pipeline = null; }
+    if (this.pipeline) { void this.pipeline.destroy(); this.pipeline = null; }
   }
 
   // ── Listening state ──────────────────────────────────────────────────────────
@@ -549,7 +549,7 @@ export class DocentVoiceManager {
 
   destroy(): void {
     this.stopTour();
-    if (this.pipeline) { this.pipeline.destroy(); this.pipeline = null; }
+    if (this.pipeline) { void this.pipeline.destroy(); this.pipeline = null; }
   }
 
   static isSupported(): boolean {

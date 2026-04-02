@@ -32,7 +32,7 @@ export class RAGRetrieval {
       return parsed;
     } catch (error) {
       console.error(`❌ Failed to parse ${filePath}:`, error);
-      throw new Error(`JSON parse error in ${path.basename(filePath)}: ${error.message}`);
+      throw new Error(`JSON parse error in ${path.basename(filePath)}: ${(error as Error).message}`);
     }
   }
 
@@ -119,7 +119,7 @@ export class RAGRetrieval {
           }
           
         } catch (fileError) {
-          console.error(`   ❌ Failed to load ${museum.id}.json:`, fileError.message);
+          console.error(`   ❌ Failed to load ${museum.id}.json:`, (fileError as Error).message);
           continue;
         }
       }

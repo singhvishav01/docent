@@ -22,7 +22,7 @@ describe('Authentication', () => {
 
   test('should generate and verify JWT tokens', () => {
     const userId = 'test-user-id'
-    const token = generateToken(userId)
+    const token = generateToken(userId, 'visitor')
     
     expect(token).toBeDefined()
     expect(typeof token).toBe('string')

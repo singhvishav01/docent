@@ -62,9 +62,9 @@ class CostMonitor {
     completionTokens: number
   ): void {
     const usage = this.getUsage();
-    const pricing = this.PRICING[model] || this.PRICING['gpt-4o-mini'];
+    const pricing = this.PRICING[model as keyof typeof this.PRICING] || this.PRICING['gpt-4o-mini'];
     
-    const cost = (promptTokens * pricing.input) + (completionTokens * pricing.output);
+    const cost = (promptTokens * pricing.input) + (completionTokens * ('output' in pricing ? pricing.output : 0));
     
     usage.chatCompletions.requests++;
     usage.chatCompletions.promptTokens += promptTokens;

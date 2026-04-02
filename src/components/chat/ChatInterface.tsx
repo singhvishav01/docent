@@ -484,3 +484,5 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
     </div>
   );
 }
+// Alias export for backwards-compatible imports
+export { ChatInterfaceWithVoice as ChatInterface };

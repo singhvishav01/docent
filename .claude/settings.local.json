@@ -18,7 +18,10 @@
       "Bash(grep:*)",
       "Bash(node:*)",
       "Bash(find:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(\"C:/Users/Vishav/Desktop/New folder \\(6\\)/docent/src/components/chat/ChatInterface.tsx\":*)"
     ]
   }
 }

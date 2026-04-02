@@ -22,7 +22,7 @@ function mapPrismaArtworkToInterface(prismaArtwork: any): Artwork {
 // Artwork queries
 export async function getArtworkById(id: string): Promise<Artwork | null> {
   try {
-    const artwork = await db.artwork.findUnique({
+    const artwork = await db.artwork.findFirst({
       where: { id }
     })
     if (!artwork) return null

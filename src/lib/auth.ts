@@ -135,14 +135,14 @@ export function requireRole(user: User | null, allowedRoles: UserRole[]): boolea
   return allowedRoles.includes(user.role)
 }
 
-export function isAdmin(user: User | null): boolean {
+export function isAdmin(user: User | null): user is User {
   return user?.role === 'admin'
 }
 
-export function isCurator(user: User | null): boolean {
+export function isCurator(user: User | null): user is User {
   return user?.role === 'curator'
 }
 
-export function isCuratorOrAdmin(user: User | null): boolean {
+export function isCuratorOrAdmin(user: User | null): user is User {
   return user?.role === 'curator' || user?.role === 'admin'
 }
