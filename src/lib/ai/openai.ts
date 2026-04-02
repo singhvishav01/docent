@@ -20,6 +20,7 @@ export interface ChatContext {
   visitorName?: string;
   docentName?: string;
   visitorProfile?: VisitorProfile;
+  conversationSummary?: string;
 }
 
 export interface CompactGroundingContext {
@@ -107,7 +108,8 @@ export function buildSystemPrompt(
   voice = false,
   visitorName?: string,
   docentName?: string,
-  visitorProfile?: VisitorProfile
+  visitorProfile?: VisitorProfile,
+  conversationSummary?: string
 ): string {
   const persona = voice ? DOCENT_VOICE_PERSONA : DOCENT_PERSONA;
 
@@ -134,7 +136,11 @@ Museum: ${artwork.museum_name || artwork.museum}`;
     ? `\nKNOWLEDGE BASE (use as your primary source — do not stray beyond it):\n${context.relevantChunks.join('\n\n')}`
     : '';
 
-  return `${persona}${visitorLine}${docentNameLine}${acquaintanceLayer}
+  const summarySection = conversationSummary
+    ? `\nCONVERSATION SO FAR: ${conversationSummary}`
+    : '';
+
+  return `${persona}${visitorLine}${docentNameLine}${acquaintanceLayer}${summarySection}
 ${artworkContext}
 ${groundingSection}
 
@@ -190,7 +196,7 @@ export async function createChatCompletion(
     const trimmedHistory = trimChatHistory(context.messages, historyTokenLimit);
 
     // Build system prompt with artwork context — voice mode uses shorter, spoken-rhythm prompt
-    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice, context.visitorName, context.docentName, context.visitorProfile);
+    const systemPrompt = buildSystemPrompt(groundingContext, context.artwork, voice, context.visitorName, context.docentName, context.visitorProfile, context.conversationSummary);
 
     if (stream) {
       // Streaming response

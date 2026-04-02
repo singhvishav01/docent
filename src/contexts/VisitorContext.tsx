@@ -14,6 +14,7 @@ interface VisitorContextValue {
   visitorProfile: VisitorProfile | null;
   setVisitorIdentity: (name: string, type: 'guest' | 'registered') => void;
   clearVisitorIdentity: () => void;
+  clearVisitorProfile: () => void;
   setDocentName: (name: string) => void;
   setVisitorProfile: (profile: VisitorProfile) => void;
   updateVisitorProfile: (patch: Partial<VisitorProfile>) => void;
@@ -209,6 +210,16 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     });
   }, [scheduleDBFlush]);
 
+  const clearVisitorProfile = () => {
+    setVisitorProfileState(null);
+    setDocentNameState(null);
+    docentNameRef.current = null;
+    try {
+      localStorage.removeItem(STORAGE_KEYS.profile);
+      localStorage.removeItem(STORAGE_KEYS.docentName);
+    } catch { /* ignore */ }
+  };
+
   const clearVisitorIdentity = () => {
     if (dbFlushTimerRef.current) clearTimeout(dbFlushTimerRef.current);
     setVisitorName(null);
@@ -237,6 +248,7 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
         visitorProfile,
         setVisitorIdentity,
         clearVisitorIdentity,
+        clearVisitorProfile,
         setDocentName,
         setVisitorProfile,
         updateVisitorProfile,

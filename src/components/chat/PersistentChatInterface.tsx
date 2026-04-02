@@ -7,11 +7,14 @@ import { SourceToggle } from './SourceToggle';
 import { DocentVoiceManager, VoiceMode } from '@/lib/voice/DocentVoiceManager';
 import { VoiceModeIndicator } from '../voice/VoiceModeIndicator';
 import { VoiceTourButton } from '../voice/VoiceTourButton';
+import { NoisyEnvironmentBanner } from '@/components/voice/NoisyEnvironmentBanner';
 import { useSession } from '@/contexts/SessionProvider';
 import { useVisitor } from '@/contexts/VisitorContext';
 import { useArtwork } from '@/contexts/ArtworkContext';
 import { applyHeuristics } from '@/lib/acquaintance/profile';
 import { TransitionManager } from '@/lib/tour/TransitionManager';
+import { Cortex } from '@/cortex';
+import type { ArtworkInfo } from '@/cortex';
 
 interface ChatMessage {
   id: string;
@@ -51,6 +54,11 @@ export function PersistentChatInterface({
 
   const assistantMessageCountRef = useRef(0);
 
+  // Rolling conversation summary — condenses old turns to save tokens
+  // Resets when the active artwork changes
+  const conversationSummaryRef = useRef<string>('');
+  const summaryMessageCountRef = useRef(0); // messages processed into current summary
+
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSources, setShowSources] = useState(false);
@@ -63,6 +71,7 @@ export function PersistentChatInterface({
   const currentArtwork = contextFull ?? fetchedArtwork;
 
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('dormant');
+  const [noisySuggestion, setNoisySuggestion] = useState<string | null>(null);
   const [isInitializingVoice, setIsInitializingVoice] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -71,6 +80,7 @@ export function PersistentChatInterface({
 
   const voiceManager = useRef<DocentVoiceManager | null>(null);
   const transitionManager = useRef<TransitionManager | null>(null);
+  const cortexRef = useRef<Cortex | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +133,11 @@ export function PersistentChatInterface({
     const tm = new TransitionManager({ dwellMs: 2000, cooldownMs: 3000 });
     tm.setInitialArtwork(artworkId);
     transitionManager.current = tm;
+
+    // Wire artwork detection to Cortex
+    tm.onArtworkDetected((artwork) => {
+      cortexRef.current?.emit('artwork_detected', artwork, 'transition_manager');
+    });
 
     // Wire the callback — always uses latest refs
     tm.onReady(async (request, context) => {
@@ -242,6 +257,10 @@ export function PersistentChatInterface({
 
     console.log(`[PersistentChat] Artwork changed: ${previousArtworkId} -> ${artworkId}`);
 
+    // Reset rolling summary for the new artwork
+    conversationSummaryRef.current = '';
+    summaryMessageCountRef.current = 0;
+
     transitionManager.current?.requestTransition({
       previousArtworkId,
       newArtworkId: artworkId,
@@ -249,6 +268,16 @@ export function PersistentChatInterface({
       newArtist: artworkArtist,
       newYear: artworkYear,
     });
+
+    // Update Cortex with current artwork info
+    if (cortexRef.current && artworkTitle) {
+      cortexRef.current.setCurrentArtwork({
+        id: artworkId,
+        title: artworkTitle,
+        artist: artworkArtist,
+        year: artworkYear,
+      });
+    }
   }, [artworkId, artworkTitle, artworkArtist, artworkYear]);
 
   // ── Voice manager setup ───────────────────────────────────────────────────
@@ -264,20 +293,38 @@ export function PersistentChatInterface({
         if (isFinal) {
           setInterimTranscript('');
           handleVoiceInputRef.current(text);
+          // Feed voice signals to Cortex
+          if (cortexRef.current) {
+            cortexRef.current.emit('visitor_spoke', {
+              transcript: text,
+              wordCount: text.trim().split(/\s+/).length,
+            }, 'voice_manager');
+          }
         } else {
           setInterimTranscript(text);
         }
       });
 
+      voiceManager.current.onSilenceDetected((duration) => {
+        cortexRef.current?.emit('visitor_silent', { duration }, 'voice_manager');
+      });
+
       voiceManager.current.onErrorOccurred((error) => {
         console.error('Voice error:', error);
-        if (error !== 'no-speech' && error !== 'aborted') {
-          alert(`Voice recognition error: ${error}`);
-        }
+        // no-speech and aborted are normal — don't surface to user
+      });
+
+      voiceManager.current.onNoisyEnvironmentDetected((suggestion) => {
+        setNoisySuggestion(suggestion);
       });
     }
 
     return () => {
+      // Abort any in-flight stream
+      if (streamAbortRef.current) {
+        streamAbortRef.current.abort();
+        streamAbortRef.current = null;
+      }
       if (voiceManager.current) {
         voiceManager.current.destroy();
       }
@@ -289,6 +336,100 @@ export function PersistentChatInterface({
       voiceManager.current.stopListening();
     }
   }, [session.isPaused]);
+
+  // ── Cortex setup ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!visitorProfile) return;
+
+    // Create or update Cortex
+    if (!cortexRef.current) {
+      cortexRef.current = new Cortex(visitorProfile);
+    } else {
+      cortexRef.current.updateProfile(visitorProfile);
+    }
+
+    const cortex = cortexRef.current;
+
+    // Register action callbacks — these map Cortex decisions to existing code paths
+    cortex.registerCallbacks({
+      onRespond: (transcript: string, _strategy: string, _maxTokens: number) => {
+        // Inject strategy as a hint into the conversation
+        handleVoiceInputRef.current(transcript);
+      },
+
+      onIntroduceArtwork: (_artwork: ArtworkInfo) => {
+        // Trigger greeting for the artwork
+        cortex.emit('session_started', { artwork: _artwork }, 'cortex');
+      },
+
+      onGentlePrompt: (style: 'observational' | 'check_in', _artwork: ArtworkInfo | null) => {
+        if (!voiceManager.current || !session.isVoiceTourActive) return;
+        const prompts = style === 'observational'
+          ? ["There's actually a detail here most people walk right past — want me to point it out?",
+             "I keep coming back to one thing in this painting. Want to hear what it is?"]
+          : ["Still with me? Or would you rather move to the next one?",
+             "Take your time — I'm here when you're ready."];
+        const text = prompts[Math.floor(Math.random() * prompts.length)];
+        const gen = voiceManager.current.beginNewVoiceResponse();
+        voiceManager.current.enqueueSentence(text, gen);
+        voiceManager.current.finalizeQueue();
+      },
+
+      onPivot: (approach: 'analogy' | 'story', interests: string[]) => {
+        if (!voiceManager.current || !session.isVoiceTourActive) return;
+        const hint = approach === 'analogy' && interests.length > 0
+          ? `Actually, here's something that might hit differently — there's a connection to ${interests[0]} here that I find fascinating.`
+          : "Let me tell you the human story behind this one, because it's wild.";
+        const gen = voiceManager.current.beginNewVoiceResponse();
+        voiceManager.current.enqueueSentence(hint, gen);
+        voiceManager.current.finalizeQueue();
+      },
+
+      onFatigueCheck: () => {
+        if (!voiceManager.current || !session.isVoiceTourActive) return;
+        const gen = voiceManager.current.beginNewVoiceResponse();
+        voiceManager.current.enqueueSentence(
+          "We've been at this a while — want to take a break and come back? I'll remember where we left off.",
+          gen
+        );
+        voiceManager.current.finalizeQueue();
+      },
+
+      onShareConnection: (artwork: ArtworkInfo, interest: string) => {
+        if (!voiceManager.current || !session.isVoiceTourActive) return;
+        const gen = voiceManager.current.beginNewVoiceResponse();
+        voiceManager.current.enqueueSentence(
+          `Actually — there's something here I think you'll appreciate given your interest in ${interest}.`,
+          gen
+        );
+        voiceManager.current.finalizeQueue();
+      },
+
+      onReturnVisit: (artwork: ArtworkInfo, previousTopics: string[]) => {
+        if (!voiceManager.current || !session.isVoiceTourActive) return;
+        const gen = voiceManager.current.beginNewVoiceResponse();
+        const text = previousTopics.length > 0
+          ? `Back to "${artwork.title}" — we were talking about ${previousTopics[0]} last time. Want to pick up there, or explore something new?`
+          : `You're back at "${artwork.title}". Anything you want to revisit, or look at it fresh?`;
+        voiceManager.current.enqueueSentence(text, gen);
+        voiceManager.current.finalizeQueue();
+      },
+
+      onInterrupt: (transcript: string) => {
+        if (voiceManager.current) {
+          voiceManager.current.stopSpeaking();
+        }
+        if (transcript.trim()) {
+          handleVoiceInputRef.current(transcript);
+        }
+      },
+    });
+
+    return () => {
+      cortexRef.current?.destroy();
+      cortexRef.current = null;
+    };
+  }, [visitorProfile?.visitor_id]); // only recreate when visitor changes
 
   const handleStartVoiceTour = async () => {
     if (!voiceManager.current || !currentArtwork) return;
@@ -359,6 +500,41 @@ export function PersistentChatInterface({
     await sendMessageToAI(userMessage.content, false);
   };
 
+  // Fire-and-forget: condense older messages into a 1-sentence summary.
+  // Called after every 5th AI response. Never blocks the user's response path.
+  const MESSAGES_PER_SUMMARY = 5;  // how many raw messages to keep before compressing
+  const RAW_KEEP = 4;               // always keep the N most recent messages raw
+
+  const maybeCompressHistory = (allArtworkMessages: Array<{ role: string; content: string }>) => {
+    const total = allArtworkMessages.length;
+    // Compress when we have more than RAW_KEEP messages beyond what's already summarised
+    const unsummarised = total - summaryMessageCountRef.current;
+    if (unsummarised < RAW_KEEP + MESSAGES_PER_SUMMARY) return;
+
+    // Messages to compress: everything except the last RAW_KEEP
+    const toCompress = allArtworkMessages.slice(summaryMessageCountRef.current, total - RAW_KEEP);
+    if (toCompress.length === 0) return;
+
+    // Mark them as processed so we don't recompress on the next call
+    summaryMessageCountRef.current = total - RAW_KEEP;
+
+    fetch('/api/chat/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: toCompress, artworkTitle: currentArtwork?.title }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.summary) {
+          // Append to existing summary (in case there were previous rounds)
+          conversationSummaryRef.current = conversationSummaryRef.current
+            ? `${conversationSummaryRef.current} ${data.summary}`
+            : data.summary;
+        }
+      })
+      .catch(() => { /* non-critical — silently ignore */ });
+  };
+
   const triggerDeepUpdateIfNeeded = (userMessage: string, assistantMessage: string) => {
     if (!visitorProfile) return;
     assistantMessageCountRef.current += 1;
@@ -392,10 +568,16 @@ export function PersistentChatInterface({
       streamAbortRef.current = null;
     }
 
-    const conversationHistory = session.messages
+    const artworkMessages = session.messages
       .filter(m => m.artworkId === artworkId)
-      .slice(-8)
       .map(m => ({ role: m.role, content: m.content }));
+
+    // Pass only the last 4 raw messages — older turns live in the rolling summary
+    const conversationHistory = artworkMessages.slice(-4);
+    const conversationSummary = conversationSummaryRef.current;
+
+    // Background compression — fires after every 5th message beyond the raw window
+    maybeCompressHistory(artworkMessages);
 
     try {
       if (visitorProfile) {
@@ -423,6 +605,7 @@ export function PersistentChatInterface({
           docentName: docentName || null,
           stream: useStreaming,
           conversationHistory,
+          conversationSummary: conversationSummary || undefined,
           voice: session.isVoiceTourActive,
           visitorProfile: visitorProfile || null,
         }),
@@ -441,7 +624,7 @@ export function PersistentChatInterface({
         function extractSentences(buf: string): [string[], string] {
           const sentences: string[] = [];
           let rest = buf;
-          const re = /^(.*?[.!?]['"]?)\s+/s;
+          const re = /^([\s\S]*?[.!?]['"]?)\s+/;
           let m;
           while ((m = re.exec(rest)) !== null) {
             const s = m[1].trim();
@@ -623,6 +806,12 @@ export function PersistentChatInterface({
       {/* ==================== MESSAGES ==================== */}
       <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {noisySuggestion && (
+            <NoisyEnvironmentBanner
+              suggestion={noisySuggestion}
+              onDismiss={() => setNoisySuggestion(null)}
+            />
+          )}
           {session.messages.map((message) => (
             <MessageBubble
               key={message.id}

@@ -33,20 +33,34 @@ function addFillers(text: string): string {
 export async function POST(req: NextRequest) {
   const { text } = await req.json();
   if (!text?.trim()) {
-    return new Response('Missing text', { status: 400 });
+    return Response.json({ error: 'Missing text' }, { status: 400 });
   }
   const cleaned = addFillers(prepareForSpeech(text));
-  const mp3 = await openai.audio.speech.create({
-    model: 'tts-1',
-    voice: 'onyx',
-    input: cleaned,
-    speed: 0.95,
-  });
-  const buffer = Buffer.from(await mp3.arrayBuffer());
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Cache-Control': 'no-cache',
-    },
-  });
+
+  const TTS_TIMEOUT_MS = 10000;
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('TTS timeout')), TTS_TIMEOUT_MS)
+  );
+
+  try {
+    const mp3 = await Promise.race([
+      openai.audio.speech.create({
+        model: 'tts-1',
+        voice: 'onyx',
+        input: cleaned,
+        speed: 0.95,
+      }),
+      timeoutPromise,
+    ]);
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'no-cache',
+      },
+    });
+  } catch (err: any) {
+    console.error('[TTS] Error:', err.message);
+    return Response.json({ error: 'TTS failed' }, { status: 500 });
+  }
 }

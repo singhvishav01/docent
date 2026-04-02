@@ -11,7 +11,14 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(npx tsc:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(find C:\\\\Users\\\\Vishav\\\\Desktop\\\\New folder \\(6\\)\\\\docent\\\\src:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)"
     ]
   }
 }

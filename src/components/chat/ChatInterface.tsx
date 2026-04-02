@@ -334,19 +334,19 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-[100dvh] w-full bg-transparent relative">
       {/* ==================== HEADER ==================== */}
-      <div className="flex-shrink-0 border-b border-gray-200">
+      <div className="flex-shrink-0 border-b border-[#C9A84C]/20 bg-[#0D0A07]/80 backdrop-blur-xl z-20">
         {/* Desktop/Tablet Header */}
         <div className="hidden sm:flex items-center justify-between p-3 sm:p-4">
           <div className="flex-1 min-w-0">
             {currentArtwork ? (
               <div className="text-sm">
-                <h3 className="font-semibold text-gray-800 truncate">{currentArtwork.title}</h3>
-                <p className="text-gray-600 truncate">{currentArtwork.artist}{currentArtwork.year ? ` (${currentArtwork.year})` : ''}</p>
+                <h3 className="text-lg font-semibold text-[#F2E8D5] truncate tracking-wider" style={{ fontFamily: "'Cinzel', serif" }}>{currentArtwork.title}</h3>
+                <p className="text-[#C9A84C] opacity-80 truncate" style={{ fontFamily: "'Raleway', sans-serif" }}>{currentArtwork.artist}{currentArtwork.year ? ` (${currentArtwork.year})` : ''}</p>
               </div>
             ) : (
-              <div className="text-sm text-gray-500">Loading...</div>
+              <div className="text-sm text-[#F2E8D5]/50 tracking-widest" style={{ fontFamily: "'Cinzel', serif" }}>LOADING...</div>
             )}
           </div>
           <div className="flex items-center gap-2 ml-4">
@@ -368,11 +368,14 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
         </div>
 
         {/* Mobile Header */}
-        <div className="sm:hidden flex flex-col gap-2 p-3 border-b border-gray-100">
+        <div className="sm:hidden flex flex-col gap-2 p-4 pt-safe safe-area-inset-top">
           <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800 truncate">
-                {currentArtwork?.title || 'Loading...'}
+            <div className="flex-1 min-w-0 pr-2">
+              <p className="text-[14px] font-semibold text-[#F2E8D5] tracking-widest truncate" style={{ fontFamily: "'Cinzel', serif" }}>
+                {currentArtwork?.title || 'LOADING...'}
+              </p>
+              <p className="text-xs text-[#C9A84C] opacity-80 truncate" style={{ fontFamily: "'Raleway', sans-serif" }}>
+                {currentArtwork?.artist || ''}
               </p>
             </div>
             <SourceToggle 
@@ -395,7 +398,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
 
       {/* Voice Mode Indicator */}
       {isVoiceTourActive && (
-        <div className="flex-shrink-0 p-3 border-b border-gray-100">
+        <div className="flex-shrink-0 p-3 border-b border-[#C9A84C]/20 bg-[#0D0A07]/90 z-10 w-full shadow-md">
           <VoiceModeIndicator mode={voiceMode} interimTranscript={interimTranscript} />
         </div>
       )}
@@ -427,14 +430,14 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
 
       {/* ==================== SOURCE PANEL ==================== */}
       {showSources && currentArtwork && (
-        <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 max-h-40 overflow-y-auto">
+        <div className="flex-shrink-0 border-t border-[#C9A84C]/20 bg-[#0D0A07]/95 max-h-40 overflow-y-auto z-10 shadow-[0_-4px_24px_rgba(0,0,0,0.5)]">
           <div className="p-3 sm:p-4">
-            <h4 className="font-semibold text-xs sm:text-sm text-gray-700 mb-2">Current Context:</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Museum:</strong> {actualMuseumId}</p>
-              <p><strong>Artwork:</strong> {currentArtwork.title}</p>
+            <h4 className="font-semibold text-xs sm:text-sm text-[#C9A84C] mb-2 tracking-widest" style={{ fontFamily: "'Cinzel', serif" }}>CURRENT CONTEXT:</h4>
+            <div className="text-xs text-[#F2E8D5]/80 space-y-1" style={{ fontFamily: "'Raleway', sans-serif" }}>
+              <p><strong className="text-[#F2E8D5]">Museum:</strong> {actualMuseumId}</p>
+              <p><strong className="text-[#F2E8D5]">Artwork:</strong> {currentArtwork.title}</p>
               {currentArtwork.curator_notes && currentArtwork.curator_notes.length > 0 && (
-                <p><strong>Curator Notes:</strong> {currentArtwork.curator_notes.length} available</p>
+                <p><strong className="text-[#F2E8D5]">Curator Notes:</strong> {currentArtwork.curator_notes.length} available</p>
               )}
             </div>
           </div>
@@ -442,15 +445,15 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
       )}
 
       {/* ==================== INPUT ==================== */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-        <div className="p-3 sm:p-4">
+      <div className="flex-shrink-0 pb-safe z-20 sticky bottom-0">
+        <div className="bg-[#0D0A07]/80 backdrop-blur-xl border-t border-[#C9A84C]/20 p-3 sm:p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
           {isVoiceTourActive ? (
-            <div className="text-center py-2 text-sm text-gray-500">
-              <p>Voice tour active - speak naturally or type below</p>
+            <div className="text-center py-2 text-xs text-[#C9A84C]/70 tracking-widest uppercase mb-1" style={{ fontFamily: "'Cinzel', serif" }}>
+              <p>Voice tour active - speak naturally</p>
             </div>
           ) : null}
           
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-3 mx-auto max-w-4xl relative">
             <textarea
               ref={inputRef}
               value={inputMessage}
@@ -463,17 +466,17 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
                     ? `Ask about "${currentArtwork.title}"...` 
                     : "Ask me anything..."
               }
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm sm:text-base min-h-[44px] max-h-[120px]"
+              className="flex-1 px-4 py-3 bg-white/5 border border-[#C9A84C]/30 text-[#F2E8D5] placeholder-[#F2E8D5]/40 rounded-xl focus:outline-none focus:border-[#C9A84C] focus:bg-white/10 resize-none text-[16px] sm:text-base min-h-[48px] max-h-[120px] transition-all duration-300"
+              style={{ fontFamily: "'Raleway', sans-serif", letterSpacing: '0.02em', height: 'auto' }}
               disabled={isLoading}
               rows={1}
-              style={{ height: 'auto' }}
             />
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0 min-h-[44px] text-sm sm:text-base font-medium"
+              className="px-5 py-3 h-[48px] bg-gradient-to-br from-[#C9A84C] to-[#A67B6B] text-[#0D0A07] rounded-xl hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_15px_rgba(201,168,76,0.3)] flex-shrink-0 flex items-center justify-center min-w-[70px]"
             >
-              Send
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-send"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
             </button>
           </div>
         </div>

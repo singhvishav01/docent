@@ -70,11 +70,11 @@ Rules:
 type TapScreen = 'interests' | 'vibe' | null;
 
 // Which tap screen to show after this turn (based on turn count)
-// Turn 2 → show interests tap after docent speaks
-// Turn 3 → show vibe tap after docent speaks
+// Turn 4 → show interests tap (after 3 real Q&A turns)
+// Turn 6 → show vibe tap (after interests Q&A turn)
 function getTapScreen(nextTurnCount: number): TapScreen {
-  if (nextTurnCount === 3) return 'interests';
-  if (nextTurnCount === 4) return 'vibe';
+  if (nextTurnCount === 4) return 'interests';
+  if (nextTurnCount === 6) return 'vibe';
   return null;
 }
 
@@ -100,7 +100,9 @@ function buildIntroConversationPrompt(
   } else if (tapScreen === 'interests') {
     turnGuidance = `You're about to show the visitor a tap screen where they'll select their interests. Say something short and natural that bridges into it — e.g. "Alright, one quick thing — I want to know what you're actually into so I can make this relevant. Tap whatever fits on the screen." Keep it under 2 sentences. Casual, not formal.`;
   } else if (tapScreen === 'vibe') {
-    turnGuidance = `The visitor just selected their interests from a tap screen. Acknowledge it briefly and naturally — one short sentence. Then say you have one last quick thing — how they want to be talked to. Bridge into the next tap screen. Under 2 sentences.`;
+    turnGuidance = `The visitor just answered a question about their interests. Acknowledge what they said briefly, then say you have one last quick thing — how they want to be talked to. Bridge into the vibe tap screen. Under 2 sentences. Casual.`;
+  } else if (turnCount === 4) {
+    turnGuidance = `The visitor just selected their interests from a tap screen. Ask ONE specific, curious follow-up question about one of the interests they picked — make it feel personal, not generic. Example: if they picked cooking, ask what they like to cook. 1 sentence only.`;
   } else if (turnCount === 0) {
     turnGuidance = `This is the FIRST spoken exchange. You are speaking out loud to the visitor. Greet them warmly but NOT with "Hello" or "Welcome" — start with something that sets the tone immediately. Then ask ONE casual question to get to know them — what brings them in, what kind of thing they're into, or what they're hoping for today. Sound like a person, not an automated system. Under 3 sentences.`;
   } else {
@@ -146,8 +148,8 @@ export async function POST(req: NextRequest) {
     const turnCount = profile.session.turn_count;
     const nextTurnCount = turnCount + 1;
 
-    // Turn 5 = handoff (final)
-    const isLastTurn = nextTurnCount >= 5;
+    // Turn 7 = handoff (final)
+    const isLastTurn = nextTurnCount >= 7;
     const tapScreen = isLastTurn ? null : getTapScreen(nextTurnCount);
 
     const conversationPrompt = buildIntroConversationPrompt(

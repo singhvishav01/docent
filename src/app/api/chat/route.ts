@@ -2,9 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '../../../lib/auth';
-import { db } from '../../../lib/db';
 import { createChatCompletion, ChatContext } from '../../../lib/ai/openai';
 import { ChunkedArtwork } from '../../../lib/rag/embeddings';
+import { getArtworkContext } from '../../../lib/artwork-cache';
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       docentName = null,
       stream: useStream = false,
       conversationHistory = [],
+      conversationSummary = '',
       voice = false,
       visitorProfile = null,
     } = await req.json();
@@ -40,44 +41,11 @@ export async function POST(req: NextRequest) {
     let chunks: ChunkedArtwork[] = [];
 
     if (artworkId && museumId) {
-      const [artworkResult, curatorNotes] = await Promise.all([
-        db.artwork.findFirst({
-          where: {
-            id: artworkId,
-            museumId: museumId
-          },
-          include: {
-            museum: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-        }),
-        db.curatorNote.findMany({
-          where: {
-            artworkId: artworkId,
-            museumId: museumId
-          },
-          include: {
-            curator: {
-              select: {
-                name: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 5
-        })
-      ]);
+      const cached = await getArtworkContext(artworkId, museumId);
 
-      artwork = artworkResult;
+      if (cached) {
+        artwork = cached.artwork;
 
-      if (artwork) {
-        // Build context chunks from artwork and curator notes
         chunks = [
           {
             id: artwork.id,
@@ -87,15 +55,14 @@ export async function POST(req: NextRequest) {
             metadata: {
               title: artwork.title,
               artist: artwork.artist,
-              year: artwork.year ?? undefined, // Convert null to undefined
+              year: artwork.year ?? undefined,
               location: artwork.gallery ?? undefined,
-              chunkType: 'description' as const
-            }
-          }
+              chunkType: 'description' as const,
+            },
+          },
         ];
 
-        // Add curator notes as chunks
-        curatorNotes.forEach((note, idx) => {
+        cached.curatorNotes.forEach((note, idx) => {
           chunks.push({
             id: artwork.id,
             museumId: artwork.museumId,
@@ -104,13 +71,12 @@ export async function POST(req: NextRequest) {
             metadata: {
               title: artwork.title,
               artist: artwork.artist,
-              year: artwork.year ?? undefined, // Convert null to undefined
+              year: artwork.year ?? undefined,
               location: artwork.gallery ?? undefined,
-              chunkType: 'curator_note' as const
-            }
+              chunkType: 'curator_note' as const,
+            },
           });
         });
-
       }
     }
 
@@ -145,6 +111,7 @@ export async function POST(req: NextRequest) {
       visitorName: visitorName || undefined,
       docentName: docentName || undefined,
       visitorProfile: visitorProfile || undefined,
+      conversationSummary: conversationSummary || undefined,
     };
 
     if (useStream) {

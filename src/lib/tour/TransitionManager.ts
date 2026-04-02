@@ -53,6 +53,7 @@ export class TransitionManager {
 
   private onTransitionReady: TransitionCallback | null = null;
   private abortController: AbortController | null = null;
+  private onArtworkDetectedCb?: (artwork: { id: string; title: string; artist?: string }) => void;
 
   constructor(config: TransitionManagerConfig = {}) {
     this.dwellMs = config.dwellMs ?? 2000;
@@ -69,6 +70,10 @@ export class TransitionManager {
 
   onReady(cb: TransitionCallback): void {
     this.onTransitionReady = cb;
+  }
+
+  onArtworkDetected(callback: (artwork: { id: string; title: string; artist?: string }) => void): void {
+    this.onArtworkDetectedCb = callback;
   }
 
   setInitialArtwork(artworkId: string): void {
@@ -101,6 +106,13 @@ export class TransitionManager {
 
     this.pendingRequest = request;
     this.state = 'DWELL_WAIT';
+
+    // Notify Cortex that a new artwork was detected (before dwell commit)
+    this.onArtworkDetectedCb?.({
+      id: request.newArtworkId,
+      title: request.newTitle,
+      artist: request.newArtist,
+    });
 
     console.log(
       `[TransitionManager] Dwell wait: ${totalWait}ms for "${request.newTitle}"`

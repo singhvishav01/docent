@@ -159,6 +159,25 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Unmount cleanup ────────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      // Stop any playing audio
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      // Stop speech recognition
+      try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+      // Clear all timers
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // ── Voice: speak + listen cycle ───────────────────────────────────────────
 
   // Uses ref so stale closures in the mount effect always call the latest version
@@ -423,6 +442,12 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
         setVoiceState('idle');
       } else if (data.isComplete) {
         onComplete(data.updatedProfile);
+      } else {
+        // AI asked a follow-up question about their interests — listen for the answer
+        setPhase('voice-qa');
+        setVoiceState('listening');
+        setShowTextInput(true);
+        if (sttSupportedRef.current) startListening();
       }
     } catch {
       setPhase('tap-vibe');

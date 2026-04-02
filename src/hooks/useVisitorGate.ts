@@ -15,15 +15,14 @@ import { useVisitorGateStore } from '@/components/auth/VisitorGateModal';
  * registered user whose intro_complete=true doesn't get the gate flashed at them.
  */
 export function useVisitorGate() {
-  const { isIdentified, isProfileLoading, visitorProfile } = useVisitor();
+  const { isIdentified, isProfileLoading, visitorProfile, visitorType } = useVisitor();
   const openGate = useVisitorGateStore(s => s.open);
 
   const requireIdentity = (): Promise<void> => {
-    // Only bypass the gate if:
-    // - profile has finished loading from DB, AND
-    // - visitor is identified, AND
-    // - intro has been completed
-    if (!isProfileLoading && isIdentified && visitorProfile?.intro_complete === true) {
+    // Only bypass the gate for registered users who have completed onboarding.
+    // Guests always go through the gate — their onboarding state is not trusted
+    // across browser sessions (different people may share a device / browser profile).
+    if (!isProfileLoading && isIdentified && visitorType === 'registered' && visitorProfile?.intro_complete === true) {
       return Promise.resolve();
     }
 

@@ -2,7 +2,7 @@
 // Generates an AI-written greeting when a visitor arrives at an artwork
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { db } from '../../../../lib/db';
+import { getArtworkContext } from '../../../../lib/artwork-cache';
 import { DOCENT_VOICE_PERSONA } from '../../../../lib/ai/docent-persona';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, baseURL: 'https://api.openai.com/v1' });
@@ -15,20 +15,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ greeting: '' }, { status: 400 });
     }
 
-    const artwork = await db.artwork.findFirst({
-      where: { id: artworkId, museumId },
-      include: { museum: { select: { name: true } } },
-    });
+    const cached = await getArtworkContext(artworkId, museumId);
 
-    if (!artwork) {
+    if (!cached) {
       return NextResponse.json({ greeting: '' }, { status: 404 });
     }
 
-    const curatorNotes = await db.curatorNote.findMany({
-      where: { artworkId, museumId },
-      orderBy: { createdAt: 'desc' },
-      take: 3,
-    });
+    const { artwork, curatorNotes } = cached;
 
     const artworkContext = `CURRENT ARTWORK
 Title:  ${artwork.title}
@@ -36,7 +29,7 @@ Artist: ${artwork.artist}${artwork.year ? `\nYear:   ${artwork.year}` : ''}${art
 Museum: ${artwork.museum.name}`;
 
     const curatorContext = curatorNotes.length > 0
-      ? `\nCURATOR NOTES:\n${curatorNotes.map((n: any) => `[${n.type}] ${n.content}`).join('\n')}`
+      ? `\nCURATOR NOTES:\n${curatorNotes.map(n => `[${n.type}] ${n.content}`).join('\n')}`
       : '';
 
     const visitorLine = visitorName
@@ -51,22 +44,31 @@ Museum: ${artwork.museum.name}`;
 
     const systemPrompt = `${DOCENT_VOICE_PERSONA}\n\n${artworkContext}${curatorContext}${visitorLine}${docentNameLine}\n\n${greetingInstruction}`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Greet me.' },
-      ],
-      max_tokens: 120,
-      temperature: 0.85,
-      stream: false,
-    });
+    const TIMEOUT_MS = 8000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Greeting timeout')), TIMEOUT_MS)
+    );
+
+    const completion = await Promise.race([
+      openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Greet me.' },
+        ],
+        max_tokens: 120,
+        temperature: 0.85,
+        stream: false,
+      }),
+      timeoutPromise,
+    ]);
 
     const greeting = completion.choices[0]?.message?.content?.trim() ?? '';
 
     return NextResponse.json({ greeting });
-  } catch (error) {
-    console.error('[greeting API] Error:', error);
-    return NextResponse.json({ greeting: '' });
+  } catch (error: any) {
+    console.error('[greeting API] Error:', error.message);
+    // Return empty so client falls back to local generateGreeting()
+    return NextResponse.json({ greeting: '' }, { status: 500 });
   }
 }

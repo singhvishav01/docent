@@ -62,17 +62,31 @@ export function useVisitorGateStore<T>(selector: (s: GateStore) => T): T {
 type Step = 'choice' | 'name' | 'docent-name' | 'acquaintance';
 
 export function VisitorGateModal() {
-  const { setVisitorIdentity, setDocentName, setVisitorProfile, visitorName, docentName, visitorProfile, isProfileLoading } = useVisitor();
+  const { setVisitorIdentity, setDocentName, setVisitorProfile, clearVisitorProfile, visitorName, docentName, visitorProfile, visitorType, isProfileLoading } = useVisitor();
   const router = useRouter();
   const isOpen = useVisitorGateStore(s => s.isOpen);
 
   // Auto-resolve: gate opened while DB was still loading, but profile came back
-  // with intro_complete === true → close without showing anything
+  // with intro_complete === true → close without showing anything.
+  // Only applies to registered users — guests always go through onboarding.
   useEffect(() => {
-    if (isOpen && !isProfileLoading && visitorProfile?.intro_complete === true) {
+    if (!isOpen || isProfileLoading) return;
+
+    if (visitorType === 'registered' && visitorProfile?.intro_complete === true) {
       _state.resolve();
+      return;
     }
-  }, [isOpen, isProfileLoading, visitorProfile]);
+
+    // Returning user with identity but no completed intro — jump to right step
+    if (visitorName) {
+      setPendingVisitorName(visitorName);
+      setPendingDocentName(docentName);
+      setStep(docentName ? 'acquaintance' : 'docent-name');
+    } else {
+      setStep('choice');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isProfileLoading, visitorProfile?.intro_complete, visitorName, visitorType]);
 
   const [step, setStep] = useState<Step>('choice');
   const [name, setName] = useState('');
@@ -90,21 +104,6 @@ export function VisitorGateModal() {
     // Step is resolved once loading is done — see effect below
   }, [isOpen]);
 
-  // Re-evaluate step whenever loading state or identity changes while modal is open
-  useEffect(() => {
-    if (!isOpen || isProfileLoading) return;
-    // Already done — auto-resolve handles it
-    if (visitorProfile?.intro_complete === true) return;
-    // Registered / named user who hasn't done intro: skip straight to acquaintance
-    if (visitorName) {
-      setPendingVisitorName(visitorName);
-      setPendingDocentName(docentName);
-      setStep(docentName ? 'acquaintance' : 'docent-name');
-    } else {
-      setStep('choice');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isProfileLoading, visitorName]);
 
   // Focus input when step 2 renders
   useEffect(() => {
@@ -129,6 +128,9 @@ export function VisitorGateModal() {
   };
 
   const handleGuestClick = () => {
+    // Clear any stored profile so guests always go through the full onboarding flow,
+    // even if they've visited before (each museum visit is a fresh experience)
+    clearVisitorProfile();
     setStepTransition(true);
     setTimeout(() => {
       setStep('name');
