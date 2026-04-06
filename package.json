@@ -6,7 +6,9 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0",
+    "dev:mobile": "node server.js",
+    "dev:mobile:full": "concurrently --names \"next,images\" --prefix-colors \"blue,yellow\" \"node server.js\" \"npm run serve:images\"",
     "build": "next build",
     "start": "next start",
     "test": "jest",

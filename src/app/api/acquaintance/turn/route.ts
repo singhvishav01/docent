@@ -98,9 +98,11 @@ function buildIntroConversationPrompt(
   if (isLastTurn) {
     turnGuidance = `This is the final intro turn. You now know the visitor's interests and communication style. Give a warm, energetic 1-2 sentence handoff that gets them excited to start — something like "Perfect. I've got a good read on you — let's go." Do NOT say "Hello" or "Welcome". Do not use the visitor's name here. Be punchy.`;
   } else if (tapScreen === 'interests') {
-    turnGuidance = `You're about to show the visitor a tap screen where they'll select their interests. Say something short and natural that bridges into it — e.g. "Alright, one quick thing — I want to know what you're actually into so I can make this relevant. Tap whatever fits on the screen." Keep it under 2 sentences. Casual, not formal.`;
+    turnGuidance = `⚠️ CRITICAL RULE: You MUST end with a statement, NEVER a question. No "?" allowed anywhere in your response.
+The visitor is about to see a tap screen where they pick their interests. React briefly to what they just said (ONE sentence, positive, no question), then transition: "There's a quick tap screen for you now — pick whatever fits." Max 2 sentences. Do NOT ask anything. Do NOT use "?".`;
   } else if (tapScreen === 'vibe') {
-    turnGuidance = `The visitor just answered a question about their interests. Acknowledge what they said briefly, then say you have one last quick thing — how they want to be talked to. Bridge into the vibe tap screen. Under 2 sentences. Casual.`;
+    turnGuidance = `⚠️ CRITICAL RULE: You MUST end with a statement, NEVER a question. No "?" allowed anywhere in your response.
+React briefly to what they said (ONE sentence, no question), then say there's one last quick thing — a tap screen for how they want to be talked to. Max 2 sentences. Do NOT ask anything. Do NOT use "?".`;
   } else if (turnCount === 4) {
     turnGuidance = `The visitor just selected their interests from a tap screen. Ask ONE specific, curious follow-up question about one of the interests they picked — make it feel personal, not generic. Example: if they picked cooking, ask what they like to cook. 1 sentence only.`;
   } else if (turnCount === 0) {

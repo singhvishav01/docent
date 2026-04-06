@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useVisitor } from '@/contexts/VisitorContext';
 import { NameYourDocent } from '@/components/onboarding/NameYourDocent';
@@ -62,9 +63,13 @@ export function useVisitorGateStore<T>(selector: (s: GateStore) => T): T {
 type Step = 'choice' | 'name' | 'docent-name' | 'acquaintance';
 
 export function VisitorGateModal() {
-  const { setVisitorIdentity, setDocentName, setVisitorProfile, clearVisitorProfile, visitorName, docentName, visitorProfile, visitorType, isProfileLoading } = useVisitor();
+  const { setVisitorIdentity, setDocentName, setVisitorProfile, clearVisitorProfile, recheckAuth, visitorName, docentName, visitorProfile, visitorType, isProfileLoading } = useVisitor();
   const router = useRouter();
   const isOpen = useVisitorGateStore(s => s.isOpen);
+
+  // Tracks whether we've already triggered a recheckAuth for the current gate open.
+  // Prevents infinite recheck loops when the user truly has no session.
+  const hasRecheckedRef = useRef(false);
 
   // Auto-resolve: gate opened while DB was still loading, but profile came back
   // with intro_complete === true → close without showing anything.
@@ -72,8 +77,17 @@ export function VisitorGateModal() {
   useEffect(() => {
     if (!isOpen || isProfileLoading) return;
 
-    if (visitorType === 'registered' && visitorProfile?.intro_complete === true) {
+    if (visitorProfile?.intro_complete === true) {
       _state.resolve();
+      return;
+    }
+
+    // If visitorType is null and we haven't yet rechecked, the context may not have
+    // re-fetched /api/auth/me after a login redirect (it only runs once on mount).
+    // Trigger one recheck before deciding which step to show.
+    if (visitorType === null && !hasRecheckedRef.current) {
+      hasRecheckedRef.current = true;
+      recheckAuth();
       return;
     }
 
@@ -96,9 +110,10 @@ export function VisitorGateModal() {
   const [stepTransition, setStepTransition] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // When the modal opens, pick the right starting step
+  // When the modal opens, reset state and pick the right starting step
   useEffect(() => {
     if (!isOpen) { setAnimateIn(false); return; }
+    hasRecheckedRef.current = false; // allow one recheck per gate open
     setName('');
     setTimeout(() => setAnimateIn(true), 10);
     // Step is resolved once loading is done — see effect below
@@ -160,7 +175,16 @@ export function VisitorGateModal() {
   };
 
   const handleAcquaintanceComplete = (profile: VisitorProfile) => {
-    setVisitorProfile(profile);
+    // Always force intro_complete=true here — this is the definitive completion
+    // point regardless of what the API returned for this profile.
+    const completedProfile = { ...profile, intro_complete: true as const };
+    // flushSync forces React to commit the state update synchronously before we
+    // resolve the gate. Without this, navigation happens before the new
+    // visitorProfile (with intro_complete=true) is in context, causing
+    // requireIdentity() on the next page to re-open the gate.
+    flushSync(() => {
+      setVisitorProfile(completedProfile);
+    });
     _state.resolve();
   };
 

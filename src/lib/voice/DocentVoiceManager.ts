@@ -441,19 +441,17 @@ export class DocentVoiceManager {
   private handleSilence(): void {
     if (this.mode !== 'listening') return;
     console.log('[Voice] Silence...');
-    if (this.onSilenceCb) this.onSilenceCb(this.silenceTimeout);
     this.silenceOffered = true;
-
-    const offers = [
-      "Feel free to ask me anything when you're ready.",
-      "Take your time. I'm here if you have any questions.",
-      "Let me know if you'd like to hear more.",
-      "I'm here to help whenever you're ready.",
-    ];
-    const offer = offers[Math.floor(Math.random() * offers.length)];
-    this.speak(offer).then(() => {
-      if (this.mode !== 'dormant') this.resumeListening();
-    });
+    if (this.onSilenceCb) {
+      // Cortex's onGentlePrompt callback will handle speaking and resumeListening.
+      this.onSilenceCb(this.silenceTimeout);
+    } else {
+      // Fallback when no Cortex is wired: speak a brief offer and resume.
+      const offer = "Take your time. I'm here if you have any questions.";
+      this.speak(offer).then(() => {
+        if (this.mode !== 'dormant') this.resumeListening();
+      });
+    }
   }
 
   // ── TTS warm-up ──────────────────────────────────────────────────────────────
@@ -505,7 +503,7 @@ export class DocentVoiceManager {
   private generateGreeting(artworkTitle: string, visitorName?: string | null): string {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { generateGreeting } = require('@/lib/greeting-generator');
+      const { generateGreeting } = require('@/lib/ai/greeting-generator');
       return generateGreeting(visitorName, artworkTitle);
     } catch {
       return visitorName

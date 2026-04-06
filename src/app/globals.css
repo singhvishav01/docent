@@ -76,3 +76,27 @@
   from { opacity: 0; transform: translateY(16px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
+
+/* ── PWA / Mobile ─────────────────────────────────────────────────────────── */
+
+/* Prevent pull-to-refresh gesture during voice tours */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* Extend content into notch / Dynamic Island / home indicator safe areas */
+.safe-top    { padding-top:    env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-left   { padding-left:   env(safe-area-inset-left); }
+.safe-right  { padding-right:  env(safe-area-inset-right); }
+
+/* Bottom UI elements (mic button, controls) — clear the home indicator */
+.bottom-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+}
+
+/* Disable tap highlight flash on interactive elements (mobile) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

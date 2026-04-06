@@ -18,6 +18,7 @@ interface VisitorContextValue {
   setDocentName: (name: string) => void;
   setVisitorProfile: (profile: VisitorProfile) => void;
   updateVisitorProfile: (patch: Partial<VisitorProfile>) => void;
+  recheckAuth: () => Promise<void>;
 }
 
 const VisitorContext = createContext<VisitorContextValue | null>(null);
@@ -273,6 +274,44 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
     });
   }, [scheduleDBFlush]);
 
+  // Re-run the auth + profile check — used after a login redirect so the context
+  // picks up the newly issued JWT without a full page reload.
+  const recheckAuth = useCallback(async () => {
+    setIsProfileLoading(true);
+    try {
+      const r = await fetch('/api/auth/me');
+      if (!r.ok) { setIsProfileLoading(false); return; }
+      const user = await r.json();
+      if (!user?.id) { setIsProfileLoading(false); return; }
+
+      const name = (user.name || user.email.split('@')[0]) as string;
+      setVisitorName(name);
+      setVisitorType('registered');
+      isRegisteredRef.current = true;
+      try {
+        localStorage.setItem(LS_KEYS.name, name);
+        localStorage.setItem(LS_KEYS.type, 'registered');
+      } catch { /* ignore */ }
+
+      try {
+        const res = await fetch('/api/profile/personality');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile) {
+            setVisitorProfileState(data.profile as VisitorProfile);
+            try { localStorage.setItem(LS_KEYS.profile, JSON.stringify(data.profile)); } catch { /* ignore */ }
+          }
+          if (data.docentName) {
+            setDocentNameState(data.docentName);
+            docentNameRef.current = data.docentName;
+            try { localStorage.setItem(LS_KEYS.docentName, data.docentName); } catch { /* ignore */ }
+          }
+        }
+      } catch { /* fall back to no profile */ }
+    } catch { /* ignore */ }
+    setIsProfileLoading(false);
+  }, []);
+
   const clearVisitorProfile = () => {
     setVisitorProfileState(null);
     setDocentNameState(null);
@@ -320,6 +359,7 @@ export function VisitorProvider({ children }: { children: React.ReactNode }) {
         setDocentName,
         setVisitorProfile,
         updateVisitorProfile,
+        recheckAuth,
       }}
     >
       {children}

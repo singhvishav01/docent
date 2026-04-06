@@ -19,6 +19,7 @@ export class DeepgramClient {
   onError: ((error: Error) => void) | null = null;
 
   private endpointing: number;
+  private _mimeType = '';
 
   constructor(endpointing = 1200) {
     this.endpointing = endpointing;
@@ -36,6 +37,22 @@ export class DeepgramClient {
 
     const dg = new DGClient({ apiKey: key });
 
+    // Detect container format BEFORE opening the socket.
+    // MediaRecorder never outputs raw PCM — it produces a container (webm/opus
+    // on Chrome/Android, mp4/aac on Safari/iOS).
+    // For container audio, do NOT pass encoding/sample_rate to Deepgram — it
+    // reads those from the container headers automatically. Passing encoding:
+    // 'linear16' while sending webm means Deepgram tries to decode webm bytes
+    // as raw PCM → no transcripts. Passing encoding: 'opus' means it expects
+    // raw Opus frames, not a webm container → also breaks.
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+      ? 'audio/webm'
+      : MediaRecorder.isTypeSupported('audio/mp4')
+      ? 'audio/mp4'
+      : '';
+
     this.socket = await dg.listen.v1.connect({
       model: 'nova-2',
       Authorization: key,
@@ -44,11 +61,11 @@ export class DeepgramClient {
       endpointing: this.endpointing,
       utterance_end_ms: 2000,
       interim_results: 'true',
-      encoding: 'linear16',
-      sample_rate: 16000,
+      // No encoding/sample_rate — Deepgram auto-detects from the audio container
       channels: 1,
       vad_events: 'true',
     });
+    this._mimeType = mimeType;
 
     this.socket.on('open', () => {
       console.log('[Deepgram] Connected');
@@ -59,12 +76,16 @@ export class DeepgramClient {
     this.socket.on('message', (msg: any) => {
       if (msg.type === 'Results') {
         const transcript = msg.channel?.alternatives?.[0]?.transcript ?? '';
+        console.log(`[Deepgram] Results: "${transcript}" (final=${msg.is_final})`);
         if (!transcript.trim()) return;
         this.onTranscript?.(transcript, msg.is_final ?? false);
       } else if (msg.type === 'SpeechStarted') {
+        console.log('[Deepgram] SpeechStarted');
         this.onSpeechStarted?.();
       } else if (msg.type === 'UtteranceEnd') {
         this.onUtteranceEnd?.();
+      } else if (msg.type === 'Metadata') {
+        console.log('[Deepgram] Metadata received (connection confirmed)');
       }
     });
 
@@ -80,23 +101,24 @@ export class DeepgramClient {
   }
 
   private streamAudio(stream: MediaStream): void {
-    // Prefer webm/opus — widest browser support for streaming
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-      ? 'audio/webm'
-      : '';
-
-    this.mediaRecorder = mimeType
-      ? new MediaRecorder(stream, { mimeType })
+    // Use the mimeType detected during socket init so MediaRecorder output
+    // matches what we told Deepgram to expect.
+    this.mediaRecorder = this._mimeType
+      ? new MediaRecorder(stream, { mimeType: this._mimeType })
       : new MediaRecorder(stream);
 
+    let chunkCount = 0;
     this.mediaRecorder.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0 && this.socket) {
+        chunkCount++;
+        if (chunkCount <= 5 || chunkCount % 50 === 0) {
+          console.log(`[Deepgram] Sending audio chunk #${chunkCount}, size=${e.data.size}b`);
+        }
         this.socket.sendMedia(e.data);
       }
     };
 
+    console.log(`[Deepgram] Starting MediaRecorder (mimeType=${this.mediaRecorder.mimeType})`);
     // 100ms chunks — low latency without overwhelming the connection
     this.mediaRecorder.start(100);
   }

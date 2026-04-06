@@ -125,6 +125,9 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
   const [showTextInput, setShowTextInput] = useState(false);
   const [textInput, setTextInput] = useState('');
 
+  // Live transcript shown while STT is active (Bug 4)
+  const [interimTranscript, setInterimTranscript] = useState('');
+
   // Voice support detection
   const [sttSupported, setSttSupported] = useState(false);
   // Refs so async callbacks always see the latest values (avoids stale closures)
@@ -135,9 +138,12 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const hasInitialized = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Stable ref to the setInterimTranscript setter so startListening's closure can call it
+  const setInterimRef = useRef(setInterimTranscript);
+  setInterimRef.current = setInterimTranscript;
 
-  // Adaptive silence threshold: 2s for onboarding (longer pauses are normal mid-sentence)
-  const SILENCE_THRESHOLD_MS = 2000;
+  // 3.5s silence threshold — onboarding answers need more time than a quick command
+  const SILENCE_THRESHOLD_MS = 3500;
   const MAX_LISTEN_MS = 30000; // safety cutoff
 
   useEffect(() => {
@@ -238,13 +244,21 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
 
     recognition.onresult = (e: any) => {
       let newFinal = '';
+      let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) {
           newFinal += e.results[i][0].transcript;
+        } else {
+          interim += e.results[i][0].transcript;
         }
       }
       if (newFinal) {
         finalTranscript += ' ' + newFinal;
+        hasSpeech = true;
+        setInterimRef.current(''); // final result arrived — clear the live preview
+      }
+      if (interim) {
+        setInterimRef.current(interim); // show live preview of what's being said
         hasSpeech = true;
       }
       // Arm/reset silence timer only after speech is actually detected.
@@ -331,6 +345,7 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
     setVoiceState('processing');
     setShowTextInput(false);
     setTextInput('');
+    setInterimTranscript('');
 
     const newHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [
       ...conversationHistory,
@@ -490,7 +505,11 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
         }),
       });
       const data = await res.json();
-      const finalProfile = data.updatedProfile;
+      // Always mark intro as complete — the vibe selection IS the last step,
+      // regardless of what turn_count the API thinks we're at. Without this,
+      // if the vibe tap fires at turn 5-6 instead of 7, intro_complete never
+      // gets set and the gate re-opens on every subsequent artwork page.
+      const finalProfile = { ...data.updatedProfile, intro_complete: true };
       setProfile(finalProfile);
       setConversationHistory([...newHistory, { role: 'assistant', content: data.nextMessage }]);
 
@@ -503,7 +522,8 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
       // Short delay then complete
       setTimeout(() => onComplete(finalProfile), 2000);
     } catch {
-      onComplete(patched);
+      // Force intro_complete even on API error — vibe was selected, we're done
+      onComplete({ ...patched, intro_complete: true });
     }
   }
 
@@ -544,6 +564,23 @@ export default function AcquaintanceIntro({ visitorName, docentName, onComplete 
 
           {/* Voice state indicator */}
           <VoiceIndicator state={voiceState} sttSupported={sttSupported} />
+
+          {/* Live interim transcript (Bug 4) */}
+          {interimTranscript && voiceState === 'listening' && (
+            <p style={{
+              fontFamily: 'Raleway, sans-serif',
+              fontSize: '13px',
+              fontWeight: 300,
+              color: 'rgba(242,232,213,0.45)',
+              fontStyle: 'italic',
+              textAlign: 'center',
+              minHeight: '20px',
+              maxWidth: '100%',
+              lineHeight: 1.5,
+            }}>
+              {interimTranscript}
+            </p>
+          )}
 
           {/* Processing spinner */}
           {voiceState === 'processing' && (

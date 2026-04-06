@@ -19,16 +19,22 @@ export function useVisitorGate() {
   const openGate = useVisitorGateStore(s => s.open);
 
   const requireIdentity = (): Promise<void> => {
-    // Only bypass the gate for registered users who have completed onboarding.
-    // Guests always go through the gate — their onboarding state is not trusted
-    // across browser sessions (different people may share a device / browser profile).
-    if (!isProfileLoading && isIdentified && visitorType === 'registered' && visitorProfile?.intro_complete === true) {
+    // Bypass for any visitor (guest or registered) who has completed onboarding.
+    // Guests use sessionStorage so intro_complete is only true within the same tab session —
+    // a new tab or browser session will start fresh (correct behaviour for shared devices).
+    if (!isProfileLoading && isIdentified && visitorProfile?.intro_complete === true) {
       return Promise.resolve();
     }
 
-    // In all other cases open the gate.
-    // If isProfileLoading is still true, VisitorGateModal will watch for it
-    // and auto-resolve once the DB confirms intro_complete === true.
+    // Registered users: also bypass while profile is still loading from DB, then
+    // VisitorGateModal will auto-resolve once DB confirms intro_complete === true.
+    if (isProfileLoading && visitorType === 'registered') {
+      return new Promise(resolve => {
+        openGate(resolve);
+      });
+    }
+
+    // All other cases: open the gate.
     return new Promise(resolve => {
       openGate(resolve);
     });

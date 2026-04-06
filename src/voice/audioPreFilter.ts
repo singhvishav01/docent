@@ -50,8 +50,15 @@ export class AudioPreFilter {
   /**
    * Connect a raw microphone stream through the filter chain.
    * Returns the cleaned MediaStream ready for Deepgram.
+   *
+   * Must be async: AudioContext can be 'suspended' when created after
+   * an `await` call (even within a user-gesture chain). We resume it
+   * here so the graph actually processes audio before recording starts.
    */
-  connect(micStream: MediaStream): MediaStream {
+  async connect(micStream: MediaStream): Promise<MediaStream> {
+    if (this.audioContext.state !== 'running') {
+      await this.audioContext.resume();
+    }
     this.sourceNode = this.audioContext.createMediaStreamSource(micStream);
     this.sourceNode.connect(this.highPassFilter);
     return this.destinationNode.stream;

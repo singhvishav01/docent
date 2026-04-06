@@ -36,7 +36,7 @@ export class VoicePipeline {
     });
 
     this.preFilter = new AudioPreFilter();
-    const filteredStream = this.preFilter.connect(this.micStream);
+    const filteredStream = await this.preFilter.connect(this.micStream);
 
     const endpointing = this.mode === 'introduction' ? 2000 : 1200;
     this.deepgram = new DeepgramClient(endpointing);

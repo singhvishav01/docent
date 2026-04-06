@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { ClientProviders } from '@/components/providers/ClientProviders'
@@ -6,12 +6,32 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// DOCENT design system fonts — loaded globally so landing page & modal work
-
 export const metadata: Metadata = {
-  icons: { icon: '/favicon.ico' },
-  title: 'DOCENT - Smart Museum Guide',
-  description: 'AI-powered museum guide with QR scanning and conversational experiences',
+  title: 'docent',
+  description: 'Your AI museum guide',
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/icons/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'docent',
+  },
+  formatDetection: { telephone: false },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#0D0A07',
 }
 
 export default function RootLayout({
