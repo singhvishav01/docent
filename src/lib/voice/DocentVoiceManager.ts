@@ -11,6 +11,13 @@ import { VoicePipeline } from '@/voice/pipeline';
 
 export type VoiceMode = 'dormant' | 'listening' | 'thinking' | 'speaking';
 
+/**
+ * Module-level lock — prevents concurrent voice tours from multiple mounted
+ * PersistentChatInterface instances (mobile + tablet layouts are both in the
+ * React tree simultaneously; CSS hides one but both are mounted).
+ */
+let _globalTourActive = false;
+
 export interface VoiceConfig {
   autoStart?: boolean;
   silenceTimeout?: number;
@@ -48,6 +55,9 @@ export class DocentVoiceManager {
   // Voice isolation pipeline (Deepgram-backed)
   private pipeline: VoicePipeline | null = null;
   private pipelineMode: 'introduction' | 'tour' = 'tour';
+
+  // Tracks whether THIS instance holds the module-level lock
+  private _ownsGlobalLock = false;
 
   constructor(config: VoiceConfig = {}) {
     this.silenceTimeout = config.silenceTimeout || 30000;
@@ -91,6 +101,14 @@ export class DocentVoiceManager {
   // ── Tour lifecycle ───────────────────────────────────────────────────────────
 
   async startTour(artworkId: string, artworkTitle: string, visitorName?: string | null): Promise<void> {
+    // Prevent two instances (e.g. mobile + tablet PCI both mounted) from racing
+    if (_globalTourActive) {
+      console.warn('[Voice] startTour ignored — another voice tour instance is already active');
+      return;
+    }
+    _globalTourActive = true;
+    this._ownsGlobalLock = true;
+
     this.currentArtwork = { id: artworkId, title: artworkTitle };
     this.silenceOffered = false;
 
@@ -113,19 +131,25 @@ export class DocentVoiceManager {
       }
     }
 
-    await this.warmUpTTS();
-
-    this.setMode('speaking');
-
-    const greeting = this.generateGreeting(artworkTitle, visitorName);
     try {
-      await this.speak(greeting);
-      console.log('[Voice] ✅ Greeting done');
-    } catch (error) {
-      console.error('[Voice] ❌ Greeting failed:', error);
-    }
+      await this.warmUpTTS();
 
-    this.startListening();
+      this.setMode('speaking');
+
+      const greeting = this.generateGreeting(artworkTitle, visitorName);
+      try {
+        await this.speak(greeting);
+        console.log('[Voice] ✅ Greeting done');
+      } catch (error) {
+        console.error('[Voice] ❌ Greeting failed:', error);
+      }
+
+      this.startListening();
+    } catch (err) {
+      // Release lock on unexpected failure so a retry is possible
+      _globalTourActive = false;
+      throw err;
+    }
   }
 
   async onArtworkChange(newArtworkId: string, newArtworkTitle: string): Promise<void> {
@@ -144,6 +168,10 @@ export class DocentVoiceManager {
   }
 
   stopTour(): void {
+    if (this._ownsGlobalLock) {
+      _globalTourActive = false;
+      this._ownsGlobalLock = false;
+    }
     this.stopListening();
     this.stopSpeaking();
     this.sentenceQueue = [];
@@ -546,7 +574,7 @@ export class DocentVoiceManager {
   getPipeline(): VoicePipeline | null { return this.pipeline; }
 
   destroy(): void {
-    this.stopTour();
+    this.stopTour(); // only resets lock if this instance owns it
     if (this.pipeline) { void this.pipeline.destroy(); this.pipeline = null; }
   }
 

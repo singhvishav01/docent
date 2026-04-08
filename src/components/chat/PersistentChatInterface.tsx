@@ -327,6 +327,7 @@ export function PersistentChatInterface({
       }
       if (voiceManager.current) {
         voiceManager.current.destroy();
+        voiceManager.current = null; // null after destroy so re-mount creates a fresh instance
       }
     };
   }, [voiceSupported]);

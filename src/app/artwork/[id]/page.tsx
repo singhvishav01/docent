@@ -11,6 +11,7 @@ import { TransitionIndicator } from '@/components/chat/TransitionIndicator';
 import { useTransition } from '@/hooks/useTransition';
 import { useArtwork } from '@/contexts/ArtworkContext';
 import { useVisitorGate } from '@/hooks/useVisitorGate';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 
 interface ArtworkPageProps {
   params: { id: string };
@@ -31,6 +32,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
   const transition = useTransition();
   const { setCurrentArtwork } = useArtwork();
   const { requireIdentity } = useVisitorGate();
+  const breakpoint = useBreakpoint();
   const [gateCleared, setGateCleared] = useState(false);
 
   // Gate check runs once on mount only
@@ -277,15 +279,17 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
                 </div>
               )}
             </div>
-            {/* Chat */}
+            {/* Chat — only mount PCI on mobile to avoid competing voice managers */}
             <div className="flex-1 min-h-0">
-              <PersistentChatInterface
-                artworkId={artworkId}
-                museumId={museumId}
-                artworkTitle={artwork.title}
-                artworkArtist={artwork.artist}
-                artworkYear={artwork.year}
-              />
+              {breakpoint === 'mobile' && (
+                <PersistentChatInterface
+                  artworkId={artworkId}
+                  museumId={museumId}
+                  artworkTitle={artwork.title}
+                  artworkArtist={artwork.artist}
+                  artworkYear={artwork.year}
+                />
+              )}
             </div>
           </div>
 
@@ -345,14 +349,17 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
                   )}
                 </div>
               )}
+              {/* Chat — only mount PCI on tablet to avoid competing voice managers */}
               <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid rgba(201,168,76,0.1)' }}>
-                <PersistentChatInterface
-                  artworkId={artworkId}
-                  museumId={museumId}
-                  artworkTitle={artwork.title}
-                  artworkArtist={artwork.artist}
-                  artworkYear={artwork.year}
-                />
+                {breakpoint === 'tablet' && (
+                  <PersistentChatInterface
+                    artworkId={artworkId}
+                    museumId={museumId}
+                    artworkTitle={artwork.title}
+                    artworkArtist={artwork.artist}
+                    artworkYear={artwork.year}
+                  />
+                )}
               </div>
             </div>
           </div>

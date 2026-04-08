@@ -67,26 +67,28 @@ export class DeepgramClient {
     });
     this._mimeType = mimeType;
 
-    this.socket.on('open', () => {
-      console.log('[Deepgram] Connected');
-      this.streamAudio(filteredStream);
-    });
+    // SDK v5: connect() resolves after the socket is open.
+    // Attach all handlers BEFORE streaming so no events are missed.
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.socket.on('message', (msg: any) => {
-      if (msg.type === 'Results') {
-        const transcript = msg.channel?.alternatives?.[0]?.transcript ?? '';
-        console.log(`[Deepgram] Results: "${transcript}" (final=${msg.is_final})`);
-        if (!transcript.trim()) return;
-        this.onTranscript?.(transcript, msg.is_final ?? false);
-      } else if (msg.type === 'SpeechStarted') {
-        console.log('[Deepgram] SpeechStarted');
-        this.onSpeechStarted?.();
-      } else if (msg.type === 'UtteranceEnd') {
-        this.onUtteranceEnd?.();
-      } else if (msg.type === 'Metadata') {
-        console.log('[Deepgram] Metadata received (connection confirmed)');
-      }
+    this.socket.on('Results', (msg: any) => {
+      const transcript = msg.channel?.alternatives?.[0]?.transcript ?? '';
+      console.log(`[Deepgram] Results: "${transcript}" (final=${msg.is_final})`);
+      if (!transcript.trim()) return;
+      this.onTranscript?.(transcript, msg.is_final ?? false);
+    });
+
+    this.socket.on('SpeechStarted', () => {
+      console.log('[Deepgram] SpeechStarted');
+      this.onSpeechStarted?.();
+    });
+
+    this.socket.on('UtteranceEnd', () => {
+      this.onUtteranceEnd?.();
+    });
+
+    this.socket.on('Metadata', () => {
+      console.log('[Deepgram] Metadata received (connection confirmed)');
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,7 +99,12 @@ export class DeepgramClient {
 
     this.socket.on('close', () => {
       console.log('[Deepgram] Closed');
+      this.socket = null; // prevent sendMedia calls on a dead socket
     });
+
+    // Start streaming now that all handlers are wired
+    console.log('[Deepgram] Connected');
+    this.streamAudio(filteredStream);
   }
 
   private streamAudio(stream: MediaStream): void {
@@ -114,7 +121,12 @@ export class DeepgramClient {
         if (chunkCount <= 5 || chunkCount % 50 === 0) {
           console.log(`[Deepgram] Sending audio chunk #${chunkCount}, size=${e.data.size}b`);
         }
-        this.socket.sendMedia(e.data);
+        try {
+          this.socket.sendMedia(e.data);
+        } catch {
+          // Socket closed mid-stream — stop recording cleanly
+          try { this.mediaRecorder?.stop(); } catch { /* ignore */ }
+        }
       }
     };
 
