@@ -77,9 +77,21 @@ export class DocentVoiceManager {
   private handleIncomingTranscript(transcript: string, isFinal: boolean): void {
     console.log(`[Voice] ${isFinal ? 'Final' : 'Interim'}: "${transcript}"`);
 
-    if (this.mode === 'speaking' && transcript.trim().length > 2) {
-      console.log('[Voice] 🛑 INTERRUPTION!');
-      this.handleInterruption(transcript, isFinal);
+    if (this.mode === 'speaking') {
+      // Interruption: ONLY fire on final transcripts with substantive content.
+      // Interim transcripts while speaking are ignored — they change word-by-word
+      // and would abort the in-flight chat request on every partial update.
+      if (isFinal) {
+        const FILLERS = new Set(['yeah', 'yes', 'no', 'uh', 'um', 'hmm', 'ah', 'oh', 'ok', 'okay', 'well', 'mm', 'mhm']);
+        const words = transcript.trim().toLowerCase().split(/\s+/);
+        const substantive = words.filter(w => !FILLERS.has(w.replace(/[.,!?]/g, '')));
+        if (substantive.length >= 2) {
+          console.log('[Voice] 🛑 INTERRUPTION!');
+          this.handleInterruption(transcript, true);
+          return;
+        }
+      }
+      // Not a real interruption — ignore while docent is speaking
       return;
     }
 
@@ -89,10 +101,12 @@ export class DocentVoiceManager {
 
     this.resetSilenceTimer();
 
+    // Forward all transcripts (interim + final) for UI display
     if (this.onTranscript) {
       this.onTranscript(transcript, isFinal);
     }
 
+    // Only fire chat request on final transcripts during listening mode
     if (isFinal && transcript.trim().length > 0 && this.mode === 'listening') {
       this.handleUserSpeech(transcript);
     }

@@ -67,8 +67,16 @@ export class AudioPreFilter {
   /**
    * Reduce gain while docent is speaking to minimise echo on the mic.
    * Browser's built-in AEC (from getUserMedia) handles most of it — this is backup.
+   *
+   * When isSpeaking goes false (TTS ended), also resume the AudioContext in case
+   * the browser suspended it during SpeechSynthesis warm-up or HTMLAudioElement
+   * playback — a suspended context produces silence, starving the MediaRecorder.
    */
   setDocentSpeaking(isSpeaking: boolean): void {
+    if (!isSpeaking && this.audioContext.state !== 'running') {
+      console.log('[AudioPreFilter] AudioContext suspended — resuming after TTS');
+      this.audioContext.resume().catch(() => { /* ignore */ });
+    }
     this.gainNode.gain.setTargetAtTime(
       isSpeaking ? 0.6 : 1.5,
       this.audioContext.currentTime,
