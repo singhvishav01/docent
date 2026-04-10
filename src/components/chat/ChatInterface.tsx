@@ -437,7 +437,7 @@ export function ChatInterfaceWithVoice({ artworkId, museumId = 'met', artworkTit
               <p><strong className="text-[#F2E8D5]">Museum:</strong> {actualMuseumId}</p>
               <p><strong className="text-[#F2E8D5]">Artwork:</strong> {currentArtwork.title}</p>
               {currentArtwork.curator_notes && currentArtwork.curator_notes.length > 0 && (
-                <p><strong className="text-[#F2E8D5]">Curator Notes:</strong> {currentArtwork.curator_notes.length} available</p>
+                <p><strong className="text-[#F2E8D5]">Curator Note of the Day:</strong> {currentArtwork.curator_notes.length} available</p>
               )}
             </div>
           </div>

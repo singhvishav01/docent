@@ -82,9 +82,10 @@ ${toneGuidance ? '\n' + toneGuidance : ''}
 Your task: write a seamless spoken transition as the visitor moves from one artwork to the next.
 
 RULES:
-- Write 2-4 sentences total, under ${midSpeech ? '85' : '65'} words.
+- Write 3-5 sentences total, under ${midSpeech ? '110' : '90'} words.
 - Do NOT start with "I" or "Hello" or "Welcome".
 - Write as if speaking aloud — short sentences, natural rhythm, contractions.
+- STRUCTURE: First 1-2 sentences bridge away from the previous artwork. Final 1-2 sentences open the new artwork with a specific intriguing detail, visual observation, or open question — pull the visitor in, don't just name the piece.
 - Try to find a thematic, visual, or historical connection between the two artworks.
 - If no obvious connection exists, use the physical act of moving to the next piece as the bridge.${
   barelyStarted
@@ -118,7 +119,7 @@ Write the transition.`
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      max_tokens: 150,
+      max_tokens: 200,
       temperature: 0.9,
     });
 

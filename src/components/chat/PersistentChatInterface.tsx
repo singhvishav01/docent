@@ -866,7 +866,7 @@ export function PersistentChatInterface({
               <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Museum:</span> {actualMuseumId}</p>
               <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Artwork:</span> {currentArtwork.title}</p>
               {currentArtwork.curator_notes && currentArtwork.curator_notes.length > 0 && (
-                <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Curator Notes:</span> {currentArtwork.curator_notes.length} available</p>
+                <p><span style={{ color: 'rgba(201,168,76,0.5)' }}>Curator Note of the Day:</span> {currentArtwork.curator_notes.length} available</p>
               )}
             </div>
           </div>
