@@ -5,6 +5,7 @@ import {
   VisitorInterruptedRule,
   ArtworkTransitionRule,
   AwkwardSilenceRule,
+  SessionResumedRule,
   VisitorWaitingRule,
   EngagementDroppingRule,
   SessionFatigueRule,
@@ -20,6 +21,7 @@ export class DecisionEngine {
     this.rules = [
       new VisitorSpokeRule(),
       new VisitorInterruptedRule(),
+      new SessionResumedRule(),       // before silence/waiting rules — resume overrides them
       new ArtworkTransitionRule(),
       new AwkwardSilenceRule(),
       new VisitorWaitingRule(),

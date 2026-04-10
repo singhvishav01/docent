@@ -53,6 +53,16 @@ export class Cortex {
     this.contextBuilder.setCurrentArtwork(artwork);
   }
 
+  /** Notify Cortex when the session pauses or resumes due to inactivity */
+  setPaused(value: boolean): void {
+    this.contextBuilder.setPaused(value);
+    if (!value) {
+      // Emit resumed signal with the actual tracked pause duration
+      const pauseDuration = this.contextBuilder.getLastPauseDuration();
+      this.signalBus.emit('session_resumed', { pauseDuration }, 'cortex_internal');
+    }
+  }
+
   /** Get the action log (for debugging / future ML) */
   getActionLog(): ActionLogEntry[] {
     return [...this.actionLog];

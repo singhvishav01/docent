@@ -20,7 +20,9 @@ interface ArtworkPageProps {
 
 export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) {
   const router = useRouter();
-  const artworkId = params.id;
+  // Keep artworkId in state so QR transitions update content in-place without
+  // unmounting the component — this keeps the voice pipeline alive across artworks.
+  const [artworkId, setArtworkId] = useState(params.id);
   const museumId = searchParams.museum || 'met';
 
   const [artwork, setArtwork] = useState<any>(null);
@@ -107,7 +109,10 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
     const handleTransition = (event: any) => {
       if (event.to && event.to !== artworkId) {
         setTimeout(() => {
-          router.push(`/artwork/${event.to}?museum=${museumId}`);
+          // Update state in-place — keeps the component (and voice pipeline) mounted.
+          // Update the URL so back/forward and sharing work correctly.
+          setArtworkId(event.to);
+          window.history.pushState({}, '', `/artwork/${event.to}?museum=${museumId}`);
         }, 500);
       }
     };

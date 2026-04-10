@@ -24,7 +24,10 @@ export class VisitorSpokeRule implements Rule {
   }
 
   private pickStrategy(ctx: CortexContext, transcript: string, wordCount: number): string {
+    // If just returning from a long pause, acknowledge naturally before diving in
+    if (ctx.energy.pauseDuration > 120000) return 'resume_after_break';
     if (wordCount <= 2 && !/\?/.test(transcript)) return 'brief_continue';
+    if (/\b(confused?|don'?t understand|what do you mean|huh|sorry)\b/i.test(transcript)) return 'clarify';
     if (/\?/.test(transcript) || /\b(why|how|what|when|who|where|tell me)\b/i.test(transcript)) return 'answer_question';
     if (/\b(reminds me|I think|I feel|looks like|my|I love|I hate)\b/i.test(transcript)) return 'engage_personal';
     return 'natural_continue';
@@ -99,7 +102,9 @@ export class ArtworkTransitionRule implements Rule {
 
 // ── Rule: Silence too long → gentle prompt ────────────────────────────────────
 export class AwkwardSilenceRule implements Rule {
-  matches(_ctx: CortexContext, signal: Signal) {
+  matches(ctx: CortexContext, signal: Signal) {
+    // Don't prompt when session is paused — visitor already flagged as inactive
+    if (ctx.energy.isPaused) return false;
     return signal.type === 'visitor_silent' && signal.value?.duration > 15000;
   }
 
@@ -111,10 +116,31 @@ export class AwkwardSilenceRule implements Rule {
   }
 }
 
+// ── Rule: Session resumed after pause → acknowledge return ────────────────────
+export class SessionResumedRule implements Rule {
+  matches(_ctx: CortexContext, signal: Signal) {
+    return signal.type === 'session_resumed';
+  }
+
+  getAction(ctx: CortexContext, signal: Signal): CortexAction {
+    const pausedMs: number = signal.value?.pauseDuration ?? 0;
+    // If paused for less than 2 minutes, just continue — brief interruption
+    if (pausedMs < 120000) return action('wait', { reason: 'brief_pause' });
+    // Longer pause: welcome back warmly
+    return action('gentle_prompt', {
+      style: 'check_in',
+      afterPause: true,
+      pausedMinutes: Math.round(pausedMs / 60000),
+      artwork: ctx.location.currentArtwork,
+    });
+  }
+}
+
 // ── Rule: Visitor waiting for intro ───────────────────────────────────────────
 export class VisitorWaitingRule implements Rule {
   matches(ctx: CortexContext, signal: Signal) {
-    return ctx.energy.isVisitorWaiting
+    return !ctx.energy.isPaused  // don't reintroduce while paused
+      && ctx.energy.isVisitorWaiting
       && !!ctx.location.currentArtwork
       && ctx.momentum.conversationDepth === 'intro'
       && signal.type !== 'visitor_spoke'; // don't double-trigger with VisitorSpokeRule

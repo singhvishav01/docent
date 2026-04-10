@@ -21,7 +21,9 @@ export type SignalType =
   | 'onboarding_complete'
   | 'session_started'
   | 'session_idle'
-  | 'session_duration';
+  | 'session_duration'
+  | 'session_paused'
+  | 'session_resumed';
 
 export interface Signal {
   type: SignalType;
@@ -99,6 +101,8 @@ export interface CortexContext {
     sessionFatigue: SessionFatigue;
     ambientNoise: number;
     recentLaughter: boolean;
+    isPaused: boolean;
+    pauseDuration: number; // ms since last pause started (0 if not paused)
   };
   recentSignals: Signal[];
 }

@@ -278,6 +278,16 @@ export function PersistentChatInterface({
         year: artworkYear,
       });
     }
+
+    // If artworkId changed AFTER initial mount and a voice tour is running,
+    // transition the voice layer to the new artwork without destroying the pipeline.
+    if (lastArtworkIdRef.current !== artworkId && artworkTitle) {
+      const mode = voiceManager.current?.getMode();
+      if (mode && mode !== 'dormant') {
+        voiceManager.current!.onArtworkChange(artworkId, artworkTitle);
+      }
+    }
+    lastArtworkIdRef.current = artworkId;
   }, [artworkId, artworkTitle, artworkArtist, artworkYear]);
 
   // ── Voice manager setup ───────────────────────────────────────────────────
@@ -337,10 +347,17 @@ export function PersistentChatInterface({
   }, [voiceSupported]);
 
   useEffect(() => {
-    if (session.isPaused && voiceManager.current) {
-      voiceManager.current.stopListening();
+    if (session.isPaused) {
+      voiceManager.current?.stopListening();
+      cortexRef.current?.setPaused(true);
+    } else {
+      if (voiceManager.current && session.isVoiceTourActive) {
+        voiceManager.current.resumeListening();
+      }
+      // setPaused(false) internally emits session_resumed with the tracked pause duration
+      cortexRef.current?.setPaused(false);
     }
-  }, [session.isPaused]);
+  }, [session.isPaused, session.isVoiceTourActive]);
 
   // ── Cortex setup ─────────────────────────────────────────────────────────────
   useEffect(() => {

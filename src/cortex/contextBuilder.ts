@@ -15,6 +15,8 @@ export class ContextBuilder {
   private lastActionTime = 0;
   private lastVisitorResponse: string | null = null;
   private lastTransitionTime = 0;
+  private isPaused = false;
+  private pauseStartTime = 0;
 
   constructor(profile: VisitorProfile, signalBus: SignalBus) {
     this.profile = profile;
@@ -24,6 +26,21 @@ export class ContextBuilder {
 
   updateProfile(profile: VisitorProfile): void {
     this.profile = profile;
+  }
+
+  private lastPauseDuration = 0;
+
+  setPaused(value: boolean): void {
+    if (value && !this.isPaused) {
+      this.pauseStartTime = Date.now();
+    } else if (!value && this.isPaused) {
+      this.lastPauseDuration = Date.now() - this.pauseStartTime;
+    }
+    this.isPaused = value;
+  }
+
+  getLastPauseDuration(): number {
+    return this.lastPauseDuration;
   }
 
   setCurrentArtwork(artwork: ArtworkInfo | null): void {
@@ -83,6 +100,8 @@ export class ContextBuilder {
         sessionFatigue: this.estimateFatigue(),
         ambientNoise: this.getAmbientNoise(recentSignals),
         recentLaughter: this.hasRecentLaughter(recentSignals),
+        isPaused: this.isPaused,
+        pauseDuration: this.isPaused ? Date.now() - this.pauseStartTime : 0,
       },
       recentSignals,
     };
