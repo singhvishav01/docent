@@ -7,7 +7,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'docent',
+  title: 'DOCENT',
   description: 'Your AI museum guide',
   manifest: '/manifest.json',
   icons: {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'docent',
+    title: 'DOCENT',
   },
   formatDetection: { telephone: false },
 }

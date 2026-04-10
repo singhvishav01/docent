@@ -5,7 +5,7 @@
  * Skips caching for real-time API calls (Deepgram, OpenAI, chat).
  */
 
-const CACHE_NAME = 'docent-v1';
+const CACHE_NAME = 'docent-v2';
 
 const NEVER_CACHE = [
   '/api/deepgram-token',
@@ -52,6 +52,6 @@ self.addEventListener('fetch', event => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then(cached => cached ?? Response.error()))
   );
 });
