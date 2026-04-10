@@ -292,13 +292,17 @@ export function PersistentChatInterface({
       voiceManager.current.onTranscriptReceived((text, isFinal) => {
         if (isFinal) {
           setInterimTranscript('');
-          handleVoiceInputRef.current(text);
-          // Feed voice signals to Cortex
           if (cortexRef.current) {
+            // Cortex decides whether/how to respond — it calls onRespond → handleVoiceInput.
+            // Do NOT also call handleVoiceInputRef directly here: that would fire two
+            // sendMessageToAI calls, the second of which aborts the first (AbortError).
             cortexRef.current.emit('visitor_spoke', {
               transcript: text,
               wordCount: text.trim().split(/\s+/).length,
             }, 'voice_manager');
+          } else {
+            // Cortex not yet initialized — call directly as fallback
+            handleVoiceInputRef.current(text);
           }
         } else {
           setInterimTranscript(text);

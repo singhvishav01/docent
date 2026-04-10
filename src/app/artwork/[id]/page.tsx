@@ -33,6 +33,13 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
   const { setCurrentArtwork } = useArtwork();
   const { requireIdentity } = useVisitorGate();
   const breakpoint = useBreakpoint();
+
+  // Route external image URLs through our proxy to avoid 429s from Wikipedia/CDNs
+  const imgSrc = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith('/') || url.startsWith('http://localhost') || url.startsWith('http://127.')) return url;
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  };
   const [gateCleared, setGateCleared] = useState(false);
 
   // Gate check runs once on mount only
@@ -232,7 +239,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div style={{ width: '96px', height: '96px', flexShrink: 0, overflow: 'hidden', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)' }}>
                   {artwork.image_url ? (
-                    <img src={artwork.image_url} alt={artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={imgSrc(artwork.image_url) ?? ''} alt={artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="32" height="32" fill="none" stroke="rgba(201,168,76,0.3)" viewBox="0 0 24 24">
@@ -299,7 +306,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
               <div style={{ background: 'rgba(242,232,213,0.03)', border: '1px solid rgba(201,168,76,0.1)', padding: '20px', display: 'flex', gap: '20px' }}>
                 <div style={{ width: '192px', height: '192px', flexShrink: 0, overflow: 'hidden', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)' }}>
                   {artwork.image_url ? (
-                    <img src={artwork.image_url} alt={artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={imgSrc(artwork.image_url) ?? ''} alt={artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="48" height="48" fill="none" stroke="rgba(201,168,76,0.3)" viewBox="0 0 24 24">
@@ -371,7 +378,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
               <div style={{ background: 'rgba(242,232,213,0.03)', border: '1px solid rgba(201,168,76,0.12)', overflow: 'hidden', marginBottom: '2px', textAlign: 'center' }}>
                 {artwork.image_url ? (
                   <img
-                    src={artwork.image_url}
+                    src={imgSrc(artwork.image_url) ?? ''}
                     alt={artwork.title}
                     style={{ width: '100%', height: 'auto', maxHeight: '70vh', objectFit: 'contain', display: 'block' }}
                   />

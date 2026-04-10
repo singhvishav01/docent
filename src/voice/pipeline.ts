@@ -38,7 +38,10 @@ export class VoicePipeline {
     this.preFilter = new AudioPreFilter();
     const filteredStream = await this.preFilter.connect(this.micStream);
 
-    const endpointing = this.mode === 'introduction' ? 2000 : 1200;
+    // 2500ms — museum visitors often pause mid-sentence while looking at artwork.
+    // 1200ms was too short and split single utterances into multiple finals,
+    // causing premature responses to fragments like "I just" before the rest arrived.
+    const endpointing = this.mode === 'introduction' ? 3000 : 2500;
     this.deepgram = new DeepgramClient(endpointing);
 
     this.deepgram.onTranscript = (transcript, isFinal) => {
