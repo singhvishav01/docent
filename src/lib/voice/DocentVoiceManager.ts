@@ -30,6 +30,7 @@ export class DocentVoiceManager {
   private synthesis: SpeechSynthesis;
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private currentAudio: HTMLAudioElement | null = null;
+  private unlockEl: HTMLAudioElement | null = null;
 
   private silenceTimer: NodeJS.Timeout | null = null;
   private silenceTimeout: number = 30000;
@@ -51,6 +52,13 @@ export class DocentVoiceManager {
   private silenceOffered = false;
   private spokenSentenceCount = 0;
   private responseGeneration = 0;
+
+  // Final-transcript debounce — Deepgram fires isFinal on every sentence-length
+  // pause within a single thought. We buffer consecutive finals and flush them as
+  // ONE combined utterance after 1500 ms of silence, preventing fragmented messages.
+  private finalBuffer: string[] = [];
+  private finalDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly FINAL_DEBOUNCE_MS = 1500;
 
   // Voice isolation pipeline (Deepgram-backed)
   private pipeline: VoicePipeline | null = null;
@@ -101,15 +109,58 @@ export class DocentVoiceManager {
 
     this.resetSilenceTimer();
 
-    // Forward all transcripts (interim + final) for UI display
+    if (isFinal && transcript.trim().length > 0 && this.mode === 'listening') {
+      // Buffer this final and wait for more — Deepgram sometimes fires multiple
+      // finals for a single continuous thought separated by short pauses.
+      // Show accumulated text as interim in the UI while we wait.
+      this.accumulateFinal(transcript);
+    } else {
+      // Interim transcripts pass through immediately for live UI display.
+      // Finals that arrive outside listening mode (e.g. mode switched) also pass through.
+      if (this.onTranscript) {
+        this.onTranscript(transcript, isFinal);
+      }
+    }
+  }
+
+  private accumulateFinal(transcript: string): void {
+    this.finalBuffer.push(transcript.trim());
+    const accumulated = this.finalBuffer.join(' ');
+
+    // Show the growing accumulated text as an interim so the user sees it building up
     if (this.onTranscript) {
-      this.onTranscript(transcript, isFinal);
+      this.onTranscript(accumulated, false);
     }
 
-    // Only fire chat request on final transcripts during listening mode
-    if (isFinal && transcript.trim().length > 0 && this.mode === 'listening') {
-      this.handleUserSpeech(transcript);
+    // Reset the debounce window
+    if (this.finalDebounceTimer) {
+      clearTimeout(this.finalDebounceTimer);
+      this.finalDebounceTimer = null;
     }
+
+    this.finalDebounceTimer = setTimeout(() => {
+      this.finalDebounceTimer = null;
+      if (this.mode !== 'listening' || this.finalBuffer.length === 0) {
+        this.finalBuffer = [];
+        return;
+      }
+      const fullText = this.finalBuffer.join(' ');
+      this.finalBuffer = [];
+      console.log(`[Voice] ✅ Flushing buffered final: "${fullText.substring(0, 80)}"`);
+      // Emit the combined text as the true final for PCI / Cortex to act on
+      if (this.onTranscript) {
+        this.onTranscript(fullText, true);
+      }
+      this.handleUserSpeech(fullText);
+    }, this.FINAL_DEBOUNCE_MS);
+  }
+
+  private clearFinalBuffer(): void {
+    if (this.finalDebounceTimer) {
+      clearTimeout(this.finalDebounceTimer);
+      this.finalDebounceTimer = null;
+    }
+    this.finalBuffer = [];
   }
 
   // ── Tour lifecycle ───────────────────────────────────────────────────────────
@@ -168,6 +219,7 @@ export class DocentVoiceManager {
 
   async onArtworkChange(newArtworkId: string, newArtworkTitle: string): Promise<void> {
     this.stopSpeaking();
+    this.clearFinalBuffer();
 
     const previousArtwork = this.currentArtwork;
     this.currentArtwork = { id: newArtworkId, title: newArtworkTitle };
@@ -188,6 +240,7 @@ export class DocentVoiceManager {
     }
     this.stopListening();
     this.stopSpeaking();
+    this.clearFinalBuffer();
     this.sentenceQueue = [];
     this.isProcessingQueue = false;
     this.queueFinalized = false;
@@ -228,6 +281,24 @@ export class DocentVoiceManager {
 
   // ── TTS ──────────────────────────────────────────────────────────────────────
 
+  /**
+   * Call this synchronously inside the user-gesture handler (e.g., "Start Tour" click)
+   * BEFORE any awaits. iOS Safari requires audio.play() to originate from a user gesture;
+   * after an await the gesture context is lost. Playing silence here unlocks the element
+   * so all subsequent play() calls (after awaits) succeed on iOS.
+   */
+  public unlockAudio(): void {
+    if (typeof window === 'undefined') return;
+    if (!this.unlockEl) {
+      this.unlockEl = new Audio();
+      this.unlockEl.preload = 'auto';
+    }
+    // Minimal silent WAV — just enough to register the element as gesture-unlocked
+    this.unlockEl.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+    this.unlockEl.volume = 0;
+    this.unlockEl.play().catch(() => { /* expected; gesture context is what matters */ });
+  }
+
   async speak(text: string): Promise<void> {
     console.log(`[Voice] Speaking via OpenAI TTS: "${text.substring(0, 50)}..."`);
     this.stopSpeaking();
@@ -247,7 +318,17 @@ export class DocentVoiceManager {
 
   private async playAudioUrl(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const audio = new Audio(url);
+      // Reuse the gesture-unlocked element so iOS Safari allows play() after awaits.
+      // If unlockAudio() was called in the gesture handler, this element is already
+      // registered as user-gesture-unlocked and won't require another gesture.
+      if (!this.unlockEl) {
+        this.unlockEl = new Audio();
+      }
+      const audio = this.unlockEl;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = url;
+      audio.volume = 1;
       this.currentAudio = audio;
 
       const interruptPoll = setInterval(() => {
@@ -468,6 +549,7 @@ export class DocentVoiceManager {
     console.log(`[Voice] 🚨 Interrupted: "${transcript}"`);
     this.responseGeneration++;
     this.stopSpeaking();
+    this.clearFinalBuffer();
     this.sentenceQueue = [];
     this.isProcessingQueue = false;
 
@@ -590,6 +672,7 @@ export class DocentVoiceManager {
   destroy(): void {
     this.stopTour(); // only resets lock if this instance owns it
     if (this.pipeline) { void this.pipeline.destroy(); this.pipeline = null; }
+    if (this.unlockEl) { this.unlockEl.pause(); this.unlockEl.src = ''; this.unlockEl = null; }
   }
 
   static isSupported(): boolean {

@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { PersistentChatInterface } from '@/components/chat/PersistentChatInterface';
 import { QRScannerModal } from '@/components/qr/QRScannerModal';
-import { FloatingScanButton } from '@/components/qr/FloatingScanButton';
 import { TransitionIndicator } from '@/components/chat/TransitionIndicator';
 import { useTransition } from '@/hooks/useTransition';
 import { useArtwork } from '@/contexts/ArtworkContext';
@@ -183,10 +182,40 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
     notFound();
   }
 
+  // Root has NO background colour — the artwork backdrop provides the dark base.
+  // position:relative + overflow:hidden keeps absolute children contained to 100vh.
   return (
-    <div style={{ minHeight: '100vh', background: '#0D0A07', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+
+      {/* ── ARTWORK BACKDROP (mobile / tablet only) ──────────────────────────────
+          Absolutely positioned so it stays within the root's 100 vh clip boundary.
+          filter is applied ONLY to the <img> element — nothing else is blurred.
+          A separate overlay div provides the dark tint for text legibility above.
+          z-index:0 keeps this behind all content (header z:30, main z:10).
+      */}
+      {artwork.image_url && (
+        <div className="lg:hidden" style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          <img
+            src={imgSrc(artwork.image_url) ?? ''}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              objectFit: 'cover',
+              /* blur + darken ONLY on the image — nothing outside this element is affected */
+              filter: 'blur(20px) brightness(0.4)',
+              transform: 'scale(1.06)', /* hides blur edges */
+            }}
+          />
+          {/* Dark overlay above image, below all content */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+        </div>
+      )}
+
       {/* ==================== HEADER ==================== */}
-      <header style={{ background: 'rgba(13,10,7,0.95)', borderBottom: '1px solid rgba(201,168,76,0.12)', position: 'sticky', top: 0, zIndex: 30, backdropFilter: 'blur(8px)' }}>
+      {/* paddingTop: safe-area-inset-top pushes content below Dynamic Island / notch */}
+      <header style={{ background: 'rgba(13,10,7,0.95)', borderBottom: '1px solid rgba(201,168,76,0.12)', position: 'sticky', top: 0, zIndex: 30, backdropFilter: 'blur(8px)', paddingTop: 'env(safe-area-inset-top)' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Breadcrumbs */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', letterSpacing: '0.05em', color: 'rgba(242,232,213,0.35)' }}>
@@ -234,39 +263,40 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
       )}
 
       {/* ==================== MAIN CONTENT ==================== */}
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      {/* z-index:10 ensures main content paints above the z-index:0 artwork backdrop */}
+      <main style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 10 }}>
         <div style={{ height: '100%', maxWidth: '1280px', margin: '0 auto' }}>
 
           {/* ========== MOBILE LAYOUT (< 768px) ========== */}
           <div className="md:hidden h-full flex flex-col">
             {/* Compact Artwork Header */}
-            <div style={{ background: 'rgba(242,232,213,0.03)', padding: '16px', borderBottom: '1px solid rgba(201,168,76,0.1)' }}>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ width: '96px', height: '96px', flexShrink: 0, overflow: 'hidden', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)' }}>
-                  {artwork.image_url ? (
-                    <img src={imgSrc(artwork.image_url) ?? ''} alt={artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <svg width="32" height="32" fill="none" stroke="rgba(201,168,76,0.3)" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+            <div style={{ background: 'rgba(13,10,7,0.55)', padding: '14px 16px', borderBottom: '1px solid rgba(201,168,76,0.1)', position: 'relative' }}>
+              {/* Title row — title on left, chevron toggle on right */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '18px', fontWeight: 400, fontStyle: 'italic', color: '#F2E8D5', marginBottom: '4px', lineHeight: 1.2 }}>{artwork.title}</h2>
-                  <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '12px', color: 'rgba(242,232,213,0.6)', letterSpacing: '0.05em' }}>{artwork.artist}</p>
-                  {artwork.year && <p style={{ fontFamily: "'Cinzel', serif", fontSize: '10px', color: 'rgba(201,168,76,0.5)', marginTop: '4px', letterSpacing: '0.1em' }}>{artwork.year}</p>}
-                  <button
-                    onClick={() => setShowDetails(!showDetails)}
-                    style={{ marginTop: '8px', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.2em', color: 'rgba(201,168,76,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    {showDetails ? 'HIDE' : 'SHOW'} DETAILS
-                    <svg style={{ width: '10px', height: '10px', transform: showDetails ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                  <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '28px', fontWeight: 400, fontStyle: 'italic', color: '#F2E8D5', marginBottom: '4px', lineHeight: 1.15 }}>{artwork.title}</h2>
+                  <p style={{ fontFamily: "'Raleway', sans-serif", fontSize: '13px', color: 'rgba(242,232,213,0.6)', letterSpacing: '0.03em' }}>
+                    {artwork.artist}{artwork.year ? `, ${artwork.year}` : ''}
+                  </p>
                 </div>
+                {/* Chevron toggle — 36×36 tap target */}
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  aria-label={showDetails ? 'Hide details' : 'Show details'}
+                  style={{
+                    flexShrink: 0, width: '36px', height: '36px', marginTop: '2px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'rgba(201,168,76,0.6)',
+                  }}
+                >
+                  <svg
+                    width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    style={{ transform: showDetails ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               </div>
               {showDetails && (
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(201,168,76,0.1)' }}>
@@ -300,6 +330,7 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
                   artworkTitle={artwork.title}
                   artworkArtist={artwork.artist}
                   artworkYear={artwork.year}
+                  thumbZoneVoice={true}
                 />
               )}
             </div>
@@ -458,14 +489,6 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
 
         </div>
       </main>
-
-      {/* Mobile/Tablet floating scan button (desktop uses header button) */}
-      <div className="lg:hidden">
-        <FloatingScanButton
-          onClick={() => setScannerOpen(true)}
-          isScanning={scannerOpen}
-        />
-      </div>
 
       {/* QR Scanner Modal */}
       <QRScannerModal

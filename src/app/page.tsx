@@ -163,7 +163,7 @@ export default function HomePage() {
       <section style={{ position: 'relative', height: '100vh', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 
         {/* Nav */}
-        <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '32px 48px' }}>
+        <nav style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(env(safe-area-inset-top) + 32px) 48px 32px' }}>
           <div>
             <div style={{ fontFamily: S.cinzel, fontSize: '14px', letterSpacing: '0.4em', color: S.parchment }}>DOCENT</div>
             <div style={{ fontFamily: S.cinzel, fontSize: '9px', letterSpacing: '0.6em', color: S.agedGold, opacity: 0.7, marginTop: '2px' }}>MUSEUM DOCENT</div>

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { SourceToggle } from './SourceToggle';
 import { DocentVoiceManager, VoiceMode } from '@/lib/voice/DocentVoiceManager';
@@ -39,6 +40,9 @@ interface PersistentChatInterfaceProps {
   artworkTitle?: string;
   artworkArtist?: string;
   artworkYear?: number;
+  /** When true, moves the voice tour button to a fixed bottom-center thumb-zone button
+   *  and hides it from the chat header toolbar. Use on mobile layouts. */
+  thumbZoneVoice?: boolean;
 }
 
 export function PersistentChatInterface({
@@ -46,7 +50,8 @@ export function PersistentChatInterface({
   museumId = 'met',
   artworkTitle,
   artworkArtist,
-  artworkYear
+  artworkYear,
+  thumbZoneVoice = false,
 }: PersistentChatInterfaceProps) {
   const session = useSession();
   const { visitorName, docentName, visitorProfile, updateVisitorProfile } = useVisitor();
@@ -455,6 +460,10 @@ export function PersistentChatInterface({
 
   const handleStartVoiceTour = async () => {
     if (!voiceManager.current || !currentArtwork) return;
+    // Must be called synchronously within the click gesture BEFORE any awaits.
+    // This registers the audio element as gesture-unlocked on iOS Safari so
+    // subsequent play() calls (after await fetch('/api/tts')) succeed.
+    voiceManager.current.unlockAudio();
     setIsInitializingVoice(true);
     try {
       await voiceManager.current.startTour(currentArtwork.id, currentArtwork.title, visitorName);
@@ -581,7 +590,9 @@ export function PersistentChatInterface({
   };
 
   const sendMessageToAI = async (content: string, isVoiceInput: boolean) => {
-    const useStreaming = isVoiceInput && session.isVoiceTourActive && !!voiceManager.current;
+    // Speak reply whenever voice tour is active, regardless of whether the input
+    // was typed or spoken (user expectation: always hear the answer in voice mode).
+    const useStreaming = session.isVoiceTourActive && !!voiceManager.current;
     setIsLoading(true);
 
     // Abort any in-flight stream from a previous call (e.g., user interrupted)
@@ -789,7 +800,7 @@ export function PersistentChatInterface({
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {voiceSupported && (
+          {voiceSupported && !thumbZoneVoice && (
             <VoiceTourButton
               isActive={session.isVoiceTourActive}
               isInitializing={isInitializingVoice}
@@ -875,7 +886,7 @@ export function PersistentChatInterface({
 
       {/* ==================== INPUT ==================== */}
       <div style={{ flexShrink: 0, borderTop: '1px solid rgba(201,168,76,0.1)', background: '#0D0A07' }}>
-        <div style={{ padding: '12px 16px' }}>
+        <div style={{ padding: `12px 16px ${thumbZoneVoice ? 'calc(env(safe-area-inset-bottom) + 88px)' : '12px'}` }}>
           {session.isVoiceTourActive && (
             <div style={{ textAlign: 'center', paddingBottom: '8px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', color: 'rgba(242,232,213,0.3)', letterSpacing: '0.04em' }}>
               Voice tour active — speak naturally or type below
@@ -943,6 +954,61 @@ export function PersistentChatInterface({
           </div>
         </div>
       </div>
+
+      {/* ==================== THUMB-ZONE VOICE BUTTON (mobile only) ==================== */}
+      {thumbZoneVoice && voiceSupported && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 40,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+        }}>
+          <button
+            onClick={session.isVoiceTourActive ? handleStopVoiceTour : handleStartVoiceTour}
+            disabled={!currentArtwork || isInitializingVoice}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: session.isVoiceTourActive
+                ? 'rgba(166,60,60,0.4)'
+                : 'rgba(13,10,7,0.9)',
+              border: `1px solid ${session.isVoiceTourActive ? 'rgba(166,60,60,0.6)' : 'rgba(201,168,76,0.4)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: (!currentArtwork || isInitializingVoice) ? 'not-allowed' : 'pointer',
+              opacity: (!currentArtwork || isInitializingVoice) ? 0.5 : 1,
+              boxShadow: session.isVoiceTourActive
+                ? '0 0 24px rgba(166,60,60,0.4), 0 4px 16px rgba(0,0,0,0.6)'
+                : '0 0 24px rgba(201,168,76,0.25), 0 4px 16px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isInitializingVoice
+              ? <Loader2 size={24} color="rgba(201,168,76,0.8)" style={{ animation: 'spin 1s linear infinite' }} />
+              : session.isVoiceTourActive
+                ? <MicOff size={24} color="rgba(220,120,120,0.9)" />
+                : <Mic size={24} color="rgba(201,168,76,0.8)" />
+            }
+          </button>
+          <span style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: '8px',
+            letterSpacing: '0.2em',
+            color: session.isVoiceTourActive ? 'rgba(220,120,120,0.7)' : 'rgba(201,168,76,0.5)',
+          }}>
+            {isInitializingVoice ? 'STARTING' : session.isVoiceTourActive ? 'END TOUR' : 'VOICE TOUR'}
+          </span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
     </div>
   );
 }

@@ -71,10 +71,29 @@ export function useQRScanner(
       setIsScanning(true)
       setError(null)
 
-      const controls = await readerRef.current.decodeFromVideoDevice(
-        undefined, // Use default camera
+      // Try to select the rear camera by device enumeration.
+      // enumerateDevices() returns empty labels until permission is granted,
+      // so we fall back to facingMode: { exact: 'environment' } in that case.
+      let videoConstraint: MediaTrackConstraints = { facingMode: { exact: 'environment' } }
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const videoInputs = devices.filter(d => d.kind === 'videoinput')
+        if (videoInputs.length > 0) {
+          // Prefer a device whose label mentions "back", "rear", or "environment"
+          const backCamera = videoInputs.find(d => /back|rear|environment/i.test(d.label))
+            ?? videoInputs[videoInputs.length - 1] // last device is usually rear on iOS
+          if (backCamera.deviceId) {
+            videoConstraint = { deviceId: { exact: backCamera.deviceId } }
+          }
+        }
+      } catch {
+        // enumerateDevices not available — keep facingMode fallback
+      }
+
+      const controls = await readerRef.current.decodeFromConstraints(
+        { video: videoConstraint },
         videoRef.current,
-        (result, error) => {
+        (result) => {
           if (result) {
             onQRCode(result.getText())
           }

@@ -1,57 +1,20 @@
 /**
- * docent Service Worker
+ * DOCENT Service Worker — passive shell.
  *
- * Strategy: network-first for everything, with cache fallback.
- * Skips caching for real-time API calls (Deepgram, OpenAI, chat).
+ * Exists to satisfy PWA installability requirements.
+ * No caching during development — all requests go straight to the network.
+ * Caching strategy will be added before production.
  */
 
-const CACHE_NAME = 'docent-v2';
+self.addEventListener('install', () => self.skipWaiting());
 
-const NEVER_CACHE = [
-  '/api/deepgram-token',
-  '/api/chat',
-  '/api/tts',
-  'api.openai.com',
-  'api.deepgram.com',
-];
-
-function shouldSkip(url) {
-  return NEVER_CACHE.some(pattern => url.includes(pattern));
-}
-
-// Install — take control immediately
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-
-// Activate — clean old caches and claim clients
 self.addEventListener('activate', event => {
+  // Clear any old caches from previous SW versions
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch — network first, cache fallback
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  if (shouldSkip(event.request.url)) return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Only cache successful same-origin or image responses
-        if (
-          response.ok &&
-          (event.request.url.startsWith(self.location.origin) ||
-           event.request.destination === 'image')
-        ) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then(cached => cached ?? Response.error()))
-  );
-});
+// No fetch handler — let every request go through to the network normally.
