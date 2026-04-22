@@ -19,10 +19,19 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
   const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0)
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [debugLog, setDebugLog] = useState<string[]>([])
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const readerRef = useRef<BrowserMultiFormatReader>()
   const streamRef = useRef<{ stop: () => void } | null>(null)
+  const hasManuallySwitch = useRef(false)
+  const nextDeviceIndexRef = useRef(0)
+
+  const dbg = (msg: string) => {
+    const ts = new Date().toISOString().slice(11, 23)
+    console.log(`[QRScanner] ${msg}`)
+    setDebugLog(prev => [`${ts} ${msg}`, ...prev].slice(0, 20))
+  }
 
   useEffect(() => {
     readerRef.current = new BrowserMultiFormatReader()
@@ -41,21 +50,27 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
     try {
       const videoDevices = await BrowserMultiFormatReader.listVideoInputDevices() || []
       setDevices(videoDevices)
+      dbg(`Devices(${videoDevices.length}): ${videoDevices.map((d, i) => `[${i}]${d.label || 'no-label'}`).join(' | ')}`)
       return videoDevices
-    } catch {
+    } catch (e: any) {
+      dbg(`listDevices ERR: ${e?.message}`)
       return []
     }
   }
 
   const requestCameraPermission = async () => {
     try {
+      dbg('Requesting permission (environment)')
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      const track = stream.getVideoTracks()[0]
+      dbg(`Permission OK — track: ${track?.label}, facing: ${track?.getSettings?.()?.facingMode}`)
       stream.getTracks().forEach(track => track.stop())
       setHasPermission(true)
       setError(null)
       await getVideoDevices()
       return true
     } catch (error: any) {
+      dbg(`Permission ERR: ${error?.name} ${error?.message}`)
       setHasPermission(false)
       if (error.name === 'NotAllowedError') {
         setError('Camera permission denied. Please enable camera access and refresh the page.')
@@ -74,9 +89,33 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
       setIsScanning(true)
       setError(null)
       const videoDevices = devices.length > 0 ? devices : await getVideoDevices()
-      const currentDevice = videoDevices[currentDeviceIndex]
+
+      let deviceId: string | undefined = undefined
+
+      if (hasManuallySwitch.current && videoDevices.length > 0) {
+        // User explicitly switched — use the selected device index
+        deviceId = videoDevices[nextDeviceIndexRef.current]?.deviceId
+        dbg(`Manual switch → idx=${nextDeviceIndexRef.current} id=${deviceId?.slice(0, 12)}`)
+      } else if (videoDevices.length > 0) {
+        // First scan: try to find back camera by label and update index accordingly.
+        // Pass undefined as deviceId so the browser respects the facingMode: 'environment'
+        // permission context granted by requestCameraPermission().
+        const backIndex = videoDevices.findIndex(d =>
+          /back|rear|environment/i.test(d.label)
+        )
+        if (backIndex >= 0) {
+          setCurrentDeviceIndex(backIndex)
+          nextDeviceIndexRef.current = backIndex
+          dbg(`Back camera found by label at idx=${backIndex}, deviceId=undefined (browser default)`)
+        } else {
+          dbg(`No back label found — using deviceId=undefined (browser default)`)
+        }
+        // deviceId stays undefined — let browser pick the back camera
+      }
+
+      dbg(`decodeFromVideoDevice(${deviceId ?? 'undefined'})`)
       const stream = await readerRef.current.decodeFromVideoDevice(
-        currentDevice?.deviceId,
+        deviceId,
         videoRef.current,
         (result, error) => {
           if (result) {
@@ -87,7 +126,13 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
         }
       )
       streamRef.current = stream
-    } catch {
+      // Log which camera is actually active after stream starts
+      if (videoRef.current?.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getVideoTracks()
+        dbg(`Active track: ${tracks[0]?.label}, facing: ${tracks[0]?.getSettings?.()?.facingMode}`)
+      }
+    } catch (e: any) {
+      dbg(`startScanning ERR: ${e?.name} ${e?.message}`)
       setError('Failed to start camera. Please try again.')
       setIsScanning(false)
     }
@@ -100,10 +145,18 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
 
   const switchCamera = async () => {
     if (devices.length <= 1) return
+    dbg(`switchCamera: ${devices.length} devices, currently idx=${currentDeviceIndex}`)
+    hasManuallySwitch.current = true
     stopScanning()
+    // Clear stale srcObject — iOS Safari PWA can hang on a blank frame if this isn't reset
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
     const nextIndex = (currentDeviceIndex + 1) % devices.length
+    nextDeviceIndexRef.current = nextIndex
     setCurrentDeviceIndex(nextIndex)
-    setTimeout(() => startScanning(), 100)
+    // 300ms gives iOS Safari enough time to fully release the previous camera
+    setTimeout(() => startScanning(), 300)
   }
 
   const handleQRCode = async (qrContent: string) => {
@@ -259,6 +312,17 @@ export function QRScannerPanel({ onQRCodeDetected, currentArtworkId }: QRScanner
         <p style={{ textAlign: 'center', fontFamily: "'Cinzel', serif", fontSize: '9px', letterSpacing: '0.15em', color: 'rgba(201,168,76,0.3)' }}>
           CAMERA {currentDeviceIndex + 1} / {devices.length}
         </p>
+      )}
+
+      {/* ── On-screen debug log (temp) ───────────────────────────────────────── */}
+      {debugLog.length > 0 && (
+        <div style={{ marginTop: '12px', padding: '8px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(201,168,76,0.15)', maxHeight: '160px', overflowY: 'auto' }}>
+          {debugLog.map((line, i) => (
+            <p key={i} style={{ fontFamily: 'monospace', fontSize: '10px', color: i === 0 ? '#C9A84C' : 'rgba(242,232,213,0.45)', margin: '2px 0', wordBreak: 'break-all' }}>
+              {line}
+            </p>
+          ))}
+        </div>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

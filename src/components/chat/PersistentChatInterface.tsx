@@ -82,6 +82,7 @@ export function PersistentChatInterface({
   const [voiceSupported, setVoiceSupported] = useState(false);
 
   const lastArtworkIdRef = useRef<string>(artworkId);
+  const lastArtworkTitleRef = useRef<string | undefined>(artworkTitle);
 
   const voiceManager = useRef<DocentVoiceManager | null>(null);
   const transitionManager = useRef<TransitionManager | null>(null);
@@ -234,6 +235,16 @@ export function PersistentChatInterface({
           vm.enqueueSentence(transitionText);
           vm.finalizeQueue();
           vm.resetSentenceCount();
+
+          // Safety net: if the sentence queue finishes but resumeListening wasn't
+          // called (e.g. timing edge case), recover voice to listening mode.
+          setTimeout(() => {
+            const mode = voiceManager.current?.getMode();
+            if (mode && mode !== 'listening' && mode !== 'dormant' && !voiceManager.current?.isCurrentlyPlaying()) {
+              console.log('[PersistentChat] Voice recovery: resuming listening after transition');
+              voiceManager.current?.resumeListening();
+            }
+          }, 5000);
         }
 
         // 8. Reset spokenSoFar tracking for the new artwork
@@ -242,6 +253,20 @@ export function PersistentChatInterface({
 
       } catch (error) {
         console.error('[PersistentChat] Transition callback error:', error);
+      }
+    });
+
+    // If the dwell timer is aborted (e.g. Cortex signal race), ensure voice
+    // doesn't get orphaned in a non-listening state.
+    tm.onAborted(() => {
+      const vm = voiceManager.current;
+      const s = sessionRef.current;
+      if (vm && s.isVoiceTourActive) {
+        const mode = vm.getMode();
+        if (mode === 'speaking' && !vm.isCurrentlyPlaying()) {
+          console.log('[PersistentChat] Voice recovery: transition aborted, resuming listening');
+          vm.resumeListening();
+        }
       }
     });
 
@@ -254,11 +279,15 @@ export function PersistentChatInterface({
   // ── Artwork change detection ──────────────────────────────────────────────
   useEffect(() => {
     if (lastArtworkIdRef.current === artworkId) return;
+    if (!artworkTitle) return;
+
+    // Guard: artworkTitle hasn't updated yet (still the old artwork's title).
+    // The effect will re-fire when artworkTitle updates since it's a dependency.
+    if (lastArtworkTitleRef.current === artworkTitle) return;
 
     const previousArtworkId = lastArtworkIdRef.current;
     lastArtworkIdRef.current = artworkId;
-
-    if (!artworkTitle) return;
+    lastArtworkTitleRef.current = artworkTitle;
 
     console.log(`[PersistentChat] Artwork changed: ${previousArtworkId} -> ${artworkId}`);
 
@@ -275,24 +304,12 @@ export function PersistentChatInterface({
     });
 
     // Update Cortex with current artwork info
-    if (cortexRef.current && artworkTitle) {
-      cortexRef.current.setCurrentArtwork({
-        id: artworkId,
-        title: artworkTitle,
-        artist: artworkArtist,
-        year: artworkYear,
-      });
-    }
-
-    // If artworkId changed AFTER initial mount and a voice tour is running,
-    // transition the voice layer to the new artwork without destroying the pipeline.
-    if (lastArtworkIdRef.current !== artworkId && artworkTitle) {
-      const mode = voiceManager.current?.getMode();
-      if (mode && mode !== 'dormant') {
-        voiceManager.current!.onArtworkChange(artworkId, artworkTitle);
-      }
-    }
-    lastArtworkIdRef.current = artworkId;
+    cortexRef.current?.setCurrentArtwork({
+      id: artworkId,
+      title: artworkTitle,
+      artist: artworkArtist,
+      year: artworkYear,
+    });
   }, [artworkId, artworkTitle, artworkArtist, artworkYear]);
 
   // ── Voice manager setup ───────────────────────────────────────────────────

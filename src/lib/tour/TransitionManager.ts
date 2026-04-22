@@ -54,6 +54,7 @@ export class TransitionManager {
   private onTransitionReady: TransitionCallback | null = null;
   private abortController: AbortController | null = null;
   private onArtworkDetectedCb?: (artwork: { id: string; title: string; artist?: string }) => void;
+  private onAbortedCb?: () => void;
 
   constructor(config: TransitionManagerConfig = {}) {
     this.dwellMs = config.dwellMs ?? 2000;
@@ -74,6 +75,10 @@ export class TransitionManager {
 
   onArtworkDetected(callback: (artwork: { id: string; title: string; artist?: string }) => void): void {
     this.onArtworkDetectedCb = callback;
+  }
+
+  onAborted(callback: () => void): void {
+    this.onAbortedCb = callback;
   }
 
   setInitialArtwork(artworkId: string): void {
@@ -136,6 +141,7 @@ export class TransitionManager {
     this.pendingRequest = null;
     this.state = 'IDLE';
     console.log('[TransitionManager] Transition aborted');
+    this.onAbortedCb?.();
   }
 
   isTransitioning(): boolean {
