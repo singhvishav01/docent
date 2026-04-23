@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Museum } from '@/lib/rag/types';
 import { useVisitorGate } from '@/hooks/useVisitorGate';
+import { BottomNavSpacer } from '@/components/nav/BottomNavSpacer';
 
 interface MuseumWithStats extends Museum {
   artworkCount?: number;
@@ -151,6 +152,7 @@ export default function MuseumsPage() {
             ))}
           </div>
         )}
+        <BottomNavSpacer />
       </div>
     </div>
   );

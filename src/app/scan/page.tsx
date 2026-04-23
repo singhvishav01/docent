@@ -3,6 +3,9 @@
 import { QRScannerPanel } from '@/components/qr/QRScanner'
 import { ManualInput } from '@/components/qr/ManualInput'
 import { useRouter } from 'next/navigation'
+import { BackButton } from '@/components/nav/BackButton'
+import { RecentlyViewed } from '@/components/scan/RecentlyViewed'
+import { BottomNavSpacer } from '@/components/nav/BottomNavSpacer'
 
 const S = {
   warmBlack: '#0D0A07',
@@ -38,9 +41,9 @@ export default function ScanPage() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <a href="/" style={{ display: 'inline-block', marginBottom: '32px', textDecoration: 'none' }}>
-            <span style={{ fontFamily: S.cinzel, fontSize: '12px', letterSpacing: '0.4em', color: S.agedGold, opacity: 0.7 }}>← DOCENT</span>
-          </a>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '24px' }}>
+            <BackButton fallbackHref="/" />
+          </div>
           <p style={{ fontFamily: S.cinzel, fontSize: '10px', letterSpacing: '0.5em', color: 'rgba(201,168,76,0.6)', marginBottom: '16px' }}>
             ◆ &nbsp; SCAN ARTWORK &nbsp; ◆
           </p>
@@ -65,6 +68,9 @@ export default function ScanPage() {
             currentArtworkId=""
           />
         </div>
+
+        {/* Recently viewed */}
+        <RecentlyViewed />
 
         {/* Divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '32px 0' }}>
@@ -99,6 +105,7 @@ export default function ScanPage() {
             </div>
           ))}
         </div>
+        <BottomNavSpacer />
       </div>
     </div>
   )

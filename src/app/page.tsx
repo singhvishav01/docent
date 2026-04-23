@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useVisitorGate } from '@/hooks/useVisitorGate';
 import { useVisitorGateStore } from '@/components/auth/VisitorGateModal';
+import { BottomNavSpacer } from '@/components/nav/BottomNavSpacer';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
@@ -432,6 +433,8 @@ export default function HomePage() {
           30% { transform: translateY(-4px); }
         }
       `}</style>
+
+      <BottomNavSpacer />
     </div>
   );
 }

@@ -52,6 +52,7 @@ export class DocentVoiceManager {
   private silenceOffered = false;
   private spokenSentenceCount = 0;
   private responseGeneration = 0;
+  private queueClearGeneration = 0;
 
   // Final-transcript debounce — Deepgram fires isFinal on every sentence-length
   // pause within a single thought. We buffer consecutive finals and flush them as
@@ -155,7 +156,7 @@ export class DocentVoiceManager {
     }, this.FINAL_DEBOUNCE_MS);
   }
 
-  private clearFinalBuffer(): void {
+  public clearFinalBuffer(): void {
     if (this.finalDebounceTimer) {
       clearTimeout(this.finalDebounceTimer);
       this.finalDebounceTimer = null;
@@ -442,6 +443,7 @@ export class DocentVoiceManager {
 
   clearQueueKeepCurrent(): void {
     this.sentenceQueue = [];
+    this.queueClearGeneration++;
   }
 
   waitForCurrentSentence(maxMs = 4000): Promise<void> {
@@ -466,6 +468,43 @@ export class DocentVoiceManager {
   getSpokenSentenceCount(): number { return this.spokenSentenceCount; }
   resetSentenceCount(): void { this.spokenSentenceCount = 0; }
   isCurrentlyPlaying(): boolean { return !!(this.currentAudio) || this.isProcessingQueue; }
+  getQueueLength(): number { return this.sentenceQueue.length; }
+
+  waitForQueueDrain(maxMs = 15000, signal?: AbortSignal): Promise<'drained' | 'timeout' | 'aborted'> {
+    return new Promise(resolve => {
+      const isDrained = () =>
+        this.sentenceQueue.length === 0 &&
+        !this.currentAudio &&
+        !this.synthesis.speaking &&
+        !this.isProcessingQueue;
+
+      if (isDrained()) { resolve('drained'); return; }
+
+      const onAbort = () => {
+        clearInterval(poll);
+        clearTimeout(deadline);
+        resolve('aborted');
+      };
+
+      const deadline = setTimeout(() => {
+        clearInterval(poll);
+        signal?.removeEventListener('abort', onAbort);
+        this.stopSpeaking();
+        resolve('timeout');
+      }, maxMs);
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      const poll = setInterval(() => {
+        if (isDrained()) {
+          clearInterval(poll);
+          clearTimeout(deadline);
+          signal?.removeEventListener('abort', onAbort);
+          resolve('drained');
+        }
+      }, 100);
+    });
+  }
 
   private async runSentenceQueue(): Promise<void> {
     if (this.isProcessingQueue) return;
@@ -493,6 +532,7 @@ export class DocentVoiceManager {
       }
 
       const sentence = this.sentenceQueue.shift();
+      const clearGenAtShift = this.queueClearGeneration;
 
       let currentAudioPromise: Promise<string>;
       if (nextAudioPromise !== null) {
@@ -510,6 +550,13 @@ export class DocentVoiceManager {
 
       try {
         const url = await currentAudioPromise;
+        // If queue was cleared while fetching (prefetch leak fix), discard this audio
+        if (this.queueClearGeneration !== clearGenAtShift) {
+          URL.revokeObjectURL(url);
+          if (nextAudioPromise) nextAudioPromise.then(u => URL.revokeObjectURL(u)).catch(() => {});
+          nextAudioPromise = null;
+          break;
+        }
         const modeNow = this.mode as VoiceMode;
         if (modeNow !== 'dormant' && this.responseGeneration === myGeneration) {
           await this.playAudioUrl(url);
@@ -650,6 +697,7 @@ export class DocentVoiceManager {
 
   onModeChanged(callback: (mode: VoiceMode) => void): void { this.onModeChange = callback; }
   onTranscriptReceived(callback: (text: string, isFinal: boolean) => void): void { this.onTranscript = callback; }
+  getTranscriptHandler(): ((text: string, isFinal: boolean) => void) | undefined { return this.onTranscript; }
   onSpeechEnded(callback: () => void): void { this.onSpeechEnd = callback; }
   onErrorOccurred(callback: (error: string) => void): void { this.onError = callback; }
   onNoisyEnvironmentDetected(callback: (suggestion: string) => void): void { this.onNoisyEnvironmentCb = callback; }

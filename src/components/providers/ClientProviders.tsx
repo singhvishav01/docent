@@ -8,6 +8,7 @@ import { FloatingChatWidget } from '@/components/chat/FloatingChatWidget';
 import { VisitorGateModal } from '@/components/auth/VisitorGateModal';
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
 import { IOSAudioUnlock } from '@/components/pwa/IOSAudioUnlock';
+import { BottomNavBar } from '@/components/nav/BottomNavBar';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           <VisitorGateModal />
           <ServiceWorkerRegistration />
           <IOSAudioUnlock />
+          <BottomNavBar />
         </ArtworkProvider>
       </VisitorProvider>
     </SessionProvider>

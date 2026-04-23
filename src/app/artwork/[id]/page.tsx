@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { PersistentChatInterface } from '@/components/chat/PersistentChatInterface';
 import { QRScannerModal } from '@/components/qr/QRScannerModal';
 import { TransitionIndicator } from '@/components/chat/TransitionIndicator';
+import { BackButton } from '@/components/nav/BackButton';
 import { useTransition } from '@/hooks/useTransition';
 import { useArtwork } from '@/contexts/ArtworkContext';
 import { useVisitorGate } from '@/hooks/useVisitorGate';
@@ -217,8 +218,13 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
       {/* paddingTop: safe-area-inset-top pushes content below Dynamic Island / notch */}
       <header style={{ background: 'rgba(13,10,7,0.95)', borderBottom: '1px solid rgba(201,168,76,0.12)', position: 'sticky', top: 0, zIndex: 30, backdropFilter: 'blur(8px)', paddingTop: 'env(safe-area-inset-top)' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Breadcrumbs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', letterSpacing: '0.05em', color: 'rgba(242,232,213,0.35)' }}>
+          {/* Mobile: back button only */}
+          <div className="md:hidden">
+            <BackButton fallbackHref="/museums" />
+          </div>
+
+          {/* Tablet/Desktop: breadcrumbs */}
+          <div className="hidden md:flex" style={{ alignItems: 'center', gap: '10px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', letterSpacing: '0.05em', color: 'rgba(242,232,213,0.35)' }}>
             <a href="/" style={{ color: 'rgba(201,168,76,0.5)', textDecoration: 'none', fontFamily: "'Cinzel', serif", fontSize: '11px', letterSpacing: '0.3em' }}>DOCENT</a>
             <span>›</span>
             <span style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>{museumId}</span>

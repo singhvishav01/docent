@@ -16,6 +16,7 @@ import { applyHeuristics } from '@/lib/acquaintance/profile';
 import { TransitionManager } from '@/lib/tour/TransitionManager';
 import { Cortex } from '@/cortex';
 import type { ArtworkInfo } from '@/cortex';
+import { useBottomNavVisible } from '@/components/nav/useBottomNavVisible';
 
 interface ChatMessage {
   id: string;
@@ -56,6 +57,7 @@ export function PersistentChatInterface({
   const session = useSession();
   const { visitorName, docentName, visitorProfile, updateVisitorProfile } = useVisitor();
   const { activeArtwork: contextArtwork } = useArtwork();
+  const { visible: navVisible, height: navHeight } = useBottomNavVisible();
 
   const assistantMessageCountRef = useRef(0);
 
@@ -155,18 +157,78 @@ export function PersistentChatInterface({
         `[PersistentChat] Transition: "${request.previousArtworkId}" -> "${request.newArtworkId}"`
       );
 
+      // Helper: detect if this transition was externally aborted (e.g. by handleVoiceInput)
+      const isTransitionStillActive = () => transitionManager.current?.isTransitioning() ?? false;
+
       try {
-        // 1. Finish current sentence gracefully if voice is active
-        const wasMidSpeech = !!(vm && s.isVoiceTourActive && vm.isCurrentlyPlaying());
-        if (wasMidSpeech) {
-          vm!.clearQueueKeepCurrent();
-          await vm!.waitForCurrentSentence(4000);
+        // 1. Decide speech wind-down strategy based on queue state
+        const isVoiceActive = !!(vm && s.isVoiceTourActive);
+        const wasMidSpeech = isVoiceActive && vm!.isCurrentlyPlaying();
+        const streamIsActive = !!streamAbortRef.current;
+        const queueLen = isVoiceActive ? vm!.getQueueLength() : 0;
+
+        // Strategy A: few sentences left and no active stream — let them finish naturally
+        const canDrainNaturally = wasMidSpeech && queueLen <= 2 && !streamIsActive;
+
+        if (isVoiceActive && wasMidSpeech) {
+          if (canDrainNaturally) {
+            // Let remaining 1-2 sentences play out, but allow early abort if visitor speaks
+            const drainAbort = new AbortController();
+            const originalHandler = vm!.getTranscriptHandler();
+
+            vm!.onTranscriptReceived((text: string, isFinal: boolean) => {
+              if (isFinal && text.trim().split(/\s+/).length >= 2) {
+                // Visitor spoke — signal the drain to stop. Don't forward to Cortex
+                // here; after the bridge plays and listening resumes they can speak again.
+                drainAbort.abort();
+              } else {
+                // Forward interim transcripts for UI display only
+                originalHandler?.(text, isFinal);
+              }
+            });
+
+            console.log(`[PersistentChat] Draining ${queueLen} remaining sentence(s) naturally`);
+            const drainResult = await vm!.waitForQueueDrain(15000, drainAbort.signal);
+
+            // Restore the original transcript handler
+            if (originalHandler) {
+              vm!.onTranscriptReceived(originalHandler);
+            } else {
+              vm!.onTranscriptReceived(() => {});
+            }
+
+            if (drainResult === 'aborted') {
+              // Visitor spoke — cut off the remaining speech and move on
+              console.log('[PersistentChat] Drain aborted by visitor speech, stopping');
+              vm!.stopSpeaking();
+              vm!.clearQueueKeepCurrent();
+            }
+          } else {
+            // Strategy B: too many sentences or stream still active — cut off gracefully
+            if (streamAbortRef.current) {
+              streamAbortRef.current.abort();
+              streamAbortRef.current = null;
+            }
+            vm!.clearQueueKeepCurrent();
+            await vm!.waitForCurrentSentence(4000);
+          }
+        } else if (streamIsActive) {
+          // Not mid-speech but stream is still running — abort it
+          streamAbortRef.current!.abort();
+          streamAbortRef.current = null;
         }
 
-        // 2. Abort any in-flight LLM stream
-        if (streamAbortRef.current) {
-          streamAbortRef.current.abort();
-          streamAbortRef.current = null;
+        // Bail out if the transition was cancelled externally (e.g. by handleVoiceInput)
+        // while we were waiting above. The onAborted callback handles voice recovery.
+        if (!isTransitionStillActive()) {
+          console.log('[PersistentChat] Transition was cancelled mid-wind-down, bailing out');
+          return;
+        }
+
+        // 2. Clear stale STT buffer to prevent old Deepgram transcripts from
+        //    corrupting voice state during the bridge
+        if (isVoiceActive) {
+          vm!.clearFinalBuffer();
         }
 
         // 3. Detect mid-question: did the last visitor turn end with '?'
@@ -184,7 +246,7 @@ export function PersistentChatInterface({
           .slice(-4)
           .map((m: ChatMessage) => ({ role: m.role, content: m.content }));
 
-        // 5. Call the upgraded transition API
+        // 5. Call the transition API
         let transitionText: string;
         try {
           const res = await fetch('/api/chat/transition', {
@@ -213,6 +275,12 @@ export function PersistentChatInterface({
             : `Moving on to "${request.newTitle}"${request.newArtist ? ` by ${request.newArtist}` : ''}${request.newYear ? `, ${request.newYear}` : ''}.`;
         }
 
+        // Bail out if cancelled while awaiting the API call
+        if (!isTransitionStillActive()) {
+          console.log('[PersistentChat] Transition cancelled during API call, bailing out');
+          return;
+        }
+
         // 6. Add transition message to session
         const transitionMsg: ChatMessage = {
           id: `transition-${request.newArtworkId}-${Date.now()}`,
@@ -230,21 +298,26 @@ export function PersistentChatInterface({
         };
         s.addMessage(transitionMsg);
 
-        // 7. Enqueue to voice pipeline if active
-        if (s.isVoiceTourActive && vm) {
-          vm.enqueueSentence(transitionText);
+        // 7. Enqueue to voice pipeline with a fresh generation (critical for stuck-state fix)
+        if (isVoiceActive && vm) {
+          // beginNewVoiceResponse() gives us a clean generation number so the queue
+          // loop's queueFinalized check will fire resumeListening() reliably.
+          const transitionGen = vm.beginNewVoiceResponse();
+          vm.enqueueSentence(transitionText, transitionGen);
           vm.finalizeQueue();
           vm.resetSentenceCount();
 
-          // Safety net: if the sentence queue finishes but resumeListening wasn't
-          // called (e.g. timing edge case), recover voice to listening mode.
-          setTimeout(() => {
+          // Multi-check safety net in case resumeListening() is missed
+          const safetyCheck = () => {
             const mode = voiceManager.current?.getMode();
             if (mode && mode !== 'listening' && mode !== 'dormant' && !voiceManager.current?.isCurrentlyPlaying()) {
-              console.log('[PersistentChat] Voice recovery: resuming listening after transition');
+              console.log('[PersistentChat] Voice recovery: force-resuming listening after transition');
               voiceManager.current?.resumeListening();
             }
-          }, 5000);
+          };
+          setTimeout(safetyCheck, 3000);
+          setTimeout(safetyCheck, 5000);
+          setTimeout(safetyCheck, 8000);
         }
 
         // 8. Reset spokenSoFar tracking for the new artwork
@@ -504,15 +577,25 @@ export function PersistentChatInterface({
   const handleVoiceInput = async (transcript: string) => {
     if (!transcript.trim()) return;
 
-    // If a transition is in progress, the visitor has moved on mentally.
-    // Abort the transition and treat their input as about the NEW artwork.
+    // If a transition is in progress, abort it and return — don't attempt to also
+    // run sendMessageToAI, which would race with the onReady callback and cause
+    // concurrent beginNewVoiceResponse() calls + AbortErrors.
+    // The transition bridge will still play (onReady continues), then resumeListening()
+    // fires automatically. The visitor can speak again immediately after.
     if (transitionManager.current?.isTransitioning()) {
-      console.log('[PersistentChat] Voice input during transition — aborting, treating as new artwork input');
+      console.log('[PersistentChat] Voice input during transition — aborting transition, visitor can speak after bridge');
       transitionManager.current.abortTransition();
       if (voiceManager.current) {
         voiceManager.current.stopSpeaking();
         voiceManager.current.clearQueueKeepCurrent();
+        // Give the onReady callback time to clean up, then resume listening
+        setTimeout(() => {
+          if (voiceManager.current && session.isVoiceTourActive) {
+            voiceManager.current.resumeListening();
+          }
+        }, 800);
       }
+      return; // Do NOT call sendMessageToAI — this prevents the AbortError race
     }
 
     session.updateActivity();
@@ -903,7 +986,7 @@ export function PersistentChatInterface({
 
       {/* ==================== INPUT ==================== */}
       <div style={{ flexShrink: 0, borderTop: '1px solid rgba(201,168,76,0.1)', background: '#0D0A07' }}>
-        <div style={{ padding: `12px 16px ${thumbZoneVoice ? 'calc(env(safe-area-inset-bottom) + 88px)' : '12px'}` }}>
+        <div style={{ padding: `12px 16px ${thumbZoneVoice ? `calc(env(safe-area-inset-bottom) + ${navHeight + 88}px)` : '12px'}`, transition: 'padding 0.3s ease' }}>
           {session.isVoiceTourActive && (
             <div style={{ textAlign: 'center', paddingBottom: '8px', fontFamily: "'Raleway', sans-serif", fontSize: '11px', color: 'rgba(242,232,213,0.3)', letterSpacing: '0.04em' }}>
               Voice tour active — speak naturally or type below
@@ -976,10 +1059,11 @@ export function PersistentChatInterface({
       {thumbZoneVoice && voiceSupported && (
         <div style={{
           position: 'fixed',
-          bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
+          bottom: `calc(env(safe-area-inset-bottom) + ${navHeight + 16}px)`,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 40,
+          transition: 'bottom 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
