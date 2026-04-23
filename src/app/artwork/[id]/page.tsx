@@ -76,7 +76,10 @@ export default function ArtworkPage({ params, searchParams }: ArtworkPageProps) 
   }, [artwork, artworkId, museumId, setCurrentArtwork]);
 
   const loadArtwork = async (id: string, museum: string) => {
-    setLoading(true);
+    // Only show the full-page loading spinner on the initial load.
+    // During QR transitions the artwork state is already populated — showing the
+    // spinner would unmount PersistentChatInterface and destroy the active voice tour.
+    if (!artwork) setLoading(true);
     try {
       const response = await fetch(`/api/artworks/${id}?museum=${museum}`);
       if (response.ok) {
